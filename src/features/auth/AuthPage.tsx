@@ -1,5 +1,4 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -19,10 +18,10 @@ export function AuthPage() {
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
-  function submitStaff(event: FormEvent<HTMLFormElement>) {
+  async function submitStaff(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    const result = login(username, password);
+    const result = await login(username, password);
     if (!result.ok) setError(result.message);
   }
 
@@ -36,18 +35,18 @@ export function AuthPage() {
       <main className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-6xl items-center gap-5 lg:grid-cols-[1fr_420px]">
         <section className="py-6">
           <p className="text-sm font-semibold text-neutral-500">MotoFlow</p>
-          <h1 className="mt-2 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">Control interno y consulta del cliente en un solo flujo.</h1>
+          <h1 className="mt-2 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">Taller de Motos Villa</h1>
           <p className="mt-4 max-w-xl text-base text-neutral-600">
-            El personal del taller entra con usuario asignado. Los clientes solo consultan el avance con placas, nombre o numero de serie.
+            Control interno del taller y consulta del cliente por placas, nombre o numero de serie.
           </p>
           <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
-              <p className="text-sm font-bold">Admin prueba</p>
-              <p className="text-sm text-neutral-500">Usuario: admin · Contraseña: 123</p>
+              <p className="text-sm font-bold">Taller principal</p>
+              <p className="text-sm text-neutral-500">Telefono: 3411674336</p>
             </div>
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
-              <p className="text-sm font-bold">Mecanico prueba</p>
-              <p className="text-sm text-neutral-500">Usuario: mecanico · Contraseña: 123</p>
+              <p className="text-sm font-bold">Contacto</p>
+              <p className="text-sm text-neutral-500">Rogelio Villa</p>
             </div>
           </div>
         </section>
@@ -55,10 +54,10 @@ export function AuthPage() {
         <aside className="grid gap-4">
           <Card>
             <h2 className="text-xl font-bold">Acceso del taller</h2>
-            <p className="mt-1 text-sm text-neutral-500">Sólo usuarios creados por el administrador.</p>
+            <p className="mt-1 text-sm text-neutral-500">Solo usuarios creados por el administrador.</p>
             <form className="mt-5 grid gap-4" onSubmit={submitStaff}>
-              <Field label="Usuario">
-                <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="admin o mecanico" autoComplete="username" />
+              <Field label="Telefono, correo o usuario">
+                <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="3411674336" autoComplete="username" />
               </Field>
               <Field label="Contraseña">
                 <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
