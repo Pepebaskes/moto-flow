@@ -1,5 +1,5 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
 import { Trash2 } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
@@ -25,7 +25,7 @@ export function ClienteDetailPage() {
   if (!cliente) return <Card>Cliente no encontrado.</Card>;
 
   async function removeCliente() {
-    if (!cliente || !window.confirm(`¿Eliminar cliente ${cliente.nombre}?`)) return;
+    if (!cliente || !window.confirm(`Eliminar cliente ${cliente.nombre}?`)) return;
     const result = await deleteCliente(cliente.id);
     if (!result.ok) {
       window.alert(result.message);
@@ -34,14 +34,16 @@ export function ClienteDetailPage() {
     navigate("/clientes");
   }
 
+  const motosCliente = motocicletas.filter((moto) => moto.cliente_id === cliente.id);
+
   return (
-    <div>
+    <div className="min-w-0">
       <PageHeader
         title={cliente.nombre}
         subtitle="Detalle y edicion del cliente."
-        actions={<Button type="button" variant="danger" onClick={() => void removeCliente()}><Trash2 className="h-4 w-4" /> Eliminar</Button>}
+        actions={<Button type="button" variant="danger" onClick={() => void removeCliente()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button>}
       />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[420px_1fr]">
+      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <Card>
           <ClienteForm
             initial={cliente}
@@ -52,16 +54,17 @@ export function ClienteDetailPage() {
           />
         </Card>
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">Motocicletas</h2>
+          <h2 className="mb-3 text-lg font-semibold text-white">Motocicletas</h2>
           <div className="space-y-2">
-            {motocicletas.filter((moto) => moto.cliente_id === cliente.id).map((moto) => (
-              <Link key={moto.id} to={`/motocicletas/${moto.id}`} className="block rounded-lg border border-neutral-200 p-3 hover:bg-neutral-50">
-                <p className="font-semibold">{moto.marca} {moto.modelo}</p>
-                <p className="text-sm text-neutral-500">{moto.placas} · {moto.kilometraje.toLocaleString()} km</p>
+            {motosCliente.map((moto) => (
+              <Link key={moto.id} to={`/motocicletas/${moto.id}`} className="block min-w-0 rounded-2xl border border-white/10 bg-[#151515] p-3 transition hover:border-[#F2B705]/35 hover:bg-[#1c1a16]">
+                <p className="break-words font-semibold text-white">{moto.marca} {moto.modelo}</p>
+                <p className="break-words text-sm text-[#FFF2E1]/60">{moto.placas} | {moto.kilometraje.toLocaleString()} km</p>
               </Link>
             ))}
+            {motosCliente.length === 0 ? <p className="text-sm text-[#FFF2E1]/60">Este cliente aun no tiene motos registradas.</p> : null}
           </div>
-          <Link to="/motocicletas/nueva"><Button className="mt-4" variant="secondary">Agregar moto</Button></Link>
+          <Link to="/motocicletas/nueva"><Button className="mt-4 w-full sm:w-auto" variant="secondary">Agregar moto</Button></Link>
         </Card>
       </div>
     </div>

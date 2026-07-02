@@ -9,11 +9,11 @@ import { estadoLabels, estadosOrden, shortDate } from "@/utils/format";
 export function KanbanPage() {
   const { ordenes, getCliente, getMoto, changeOrderStatus } = useWorkshopStore();
   return (
-    <div>
+    <div className="min-w-0">
       <PageHeader title="Kanban" subtitle="Vista por estado. El cambio se hace con selector." />
-      <div className="grid auto-cols-[minmax(280px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-3">
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:auto-cols-[minmax(280px,1fr)] md:grid-flow-col md:overflow-x-auto md:pb-3">
         {estadosOrden.map((estado) => (
-          <section key={estado} className="min-w-[280px]">
+          <section key={estado} className="min-w-0 md:min-w-[280px]">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase text-neutral-600">{estadoLabels[estado]}</h2>
               <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-semibold">{ordenes.filter((orden) => orden.estado === estado).length}</span>

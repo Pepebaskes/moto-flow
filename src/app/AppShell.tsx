@@ -125,7 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       ) : null}
 
-      <div className="min-w-0 lg:pl-72">
+      <div className="w-full min-w-0 max-w-full lg:pl-72">
         <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0B0B0B]/85 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -142,11 +142,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <p className="truncate text-lg font-semibold text-white">Panel del taller</p>
               </div>
             </div>
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 shrink items-center justify-end gap-2">
               <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-[#FFF2E1]/75 sm:inline-flex">
                 {usingSupabase ? (hasSession ? "Supabase activo" : "Supabase conectado") : "Modo local"}
               </span>
-              <span className="max-w-[140px] truncate rounded-full bg-[#F2B705]/10 px-3 py-1 text-xs font-semibold text-[#FFF2E1] sm:max-w-none">
+              <span className="max-w-[88px] truncate rounded-full bg-[#F2B705]/10 px-2.5 py-1 text-xs font-semibold text-[#FFF2E1] min-[380px]:max-w-[140px] sm:max-w-none sm:px-3">
                 {user.name}
               </span>
               <button
@@ -163,7 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {error ? <p className="mt-2 rounded-2xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200">{error}</p> : null}
         </header>
 
-        <main className="mx-auto min-w-0 max-w-7xl px-4 py-5 sm:px-6 lg:px-8">{children}</main>
+        <main className="mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 py-5 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

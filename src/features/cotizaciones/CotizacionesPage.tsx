@@ -141,10 +141,10 @@ export function CotizacionesPage() {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <PageHeader title="Cotizaciones" subtitle="Presupuestos para servicios, refacciones o revisiones antes de autorizar el trabajo." />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Nueva cotizacion</h2>
           <form className="grid gap-4" onSubmit={save}>
@@ -176,19 +176,19 @@ export function CotizacionesPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex min-w-0 flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                 <h3 className="font-semibold">Conceptos</h3>
-                <Button type="button" variant="secondary" onClick={() => setItems((current) => [...current, { id: uid("item"), concepto: "", cantidad: 1, precio_unitario: 0, proveedor: "" }])}>
+                <Button type="button" variant="secondary" className="w-full min-[420px]:w-auto" onClick={() => setItems((current) => [...current, { id: uid("item"), concepto: "", cantidad: 1, precio_unitario: 0, proveedor: "" }])}>
                   Agregar concepto
                 </Button>
               </div>
 
               {items.map((item, index) => (
-                <div key={item.id} className="rounded-lg border border-neutral-200 p-3">
-                  <div className="mb-2 flex items-center justify-between">
+                <div key={item.id} className="min-w-0 rounded-2xl border border-white/10 bg-[#151515] p-3">
+                  <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
                     <p className="text-sm font-semibold">Partida {index + 1}</p>
                     {items.length > 1 ? (
-                      <button type="button" className="text-xs font-semibold text-red-600" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))}>
+                      <button type="button" className="shrink-0 text-xs font-semibold text-red-200" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))}>
                         Quitar
                       </button>
                     ) : null}
@@ -211,9 +211,9 @@ export function CotizacionesPage() {
               ))}
             </div>
 
-            <div className="rounded-lg bg-neutral-50 p-4">
-              <p className="text-sm text-neutral-500">Total estimado</p>
-              <p className="text-2xl font-semibold">{currency(total)}</p>
+            <div className="min-w-0 rounded-2xl bg-[#2F2A24] p-4">
+              <p className="text-sm text-[#FFF2E1]/65">Total estimado</p>
+              <p className="break-words text-2xl font-semibold text-white">{currency(total)}</p>
             </div>
 
             <Field label="Notas">
@@ -228,30 +228,30 @@ export function CotizacionesPage() {
           </form>
         </Card>
 
-        <aside className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase text-neutral-500">Cotizaciones recientes</h2>
-          {cotizaciones.length === 0 ? <Card><p className="text-sm text-neutral-500">Aun no hay cotizaciones guardadas.</p></Card> : null}
+        <aside className="min-w-0 space-y-3">
+          <h2 className="text-sm font-semibold uppercase text-[#FFF2E1]/60">Cotizaciones recientes</h2>
+          {cotizaciones.length === 0 ? <Card><p className="text-sm text-[#FFF2E1]/60">Aun no hay cotizaciones guardadas.</p></Card> : null}
           {cotizaciones.map((cotizacion) => {
             const cliente = getCliente(cotizacion.cliente_id);
             const moto = cotizacion.moto_id ? getMoto(cotizacion.moto_id) : undefined;
             const motoLabel = moto ? `${moto.marca} ${moto.modelo} ${moto.placas}` : "Sin moto";
             return (
               <Card key={cotizacion.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{cotizacion.folio}</p>
-                    <p className="text-sm text-neutral-500">{cliente?.nombre}</p>
-                    <p className="text-sm text-neutral-500">{motoLabel}</p>
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold">{cotizacion.folio}</p>
+                    <p className="truncate text-sm text-[#FFF2E1]/60">{cliente?.nombre}</p>
+                    <p className="truncate text-sm text-[#FFF2E1]/60">{motoLabel}</p>
                   </div>
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold">{cotizacion.estado}</span>
+                  <span className="shrink-0 rounded-full bg-[#F2B705]/10 px-2.5 py-1 text-xs font-semibold text-[#FFF2E1]">{cotizacion.estado}</span>
                 </div>
-                <p className="mt-3 text-sm font-semibold">{cotizacion.titulo}</p>
-                <p className="text-lg font-semibold">{currency(totalCotizacion(cotizacion.items))}</p>
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <Button variant="secondary" onClick={() => downloadCotizacionPdf(cotizacion, cliente?.nombre ?? "Cliente", motoLabel)}>
+                <p className="mt-3 break-words text-sm font-semibold">{cotizacion.titulo}</p>
+                <p className="break-words text-lg font-semibold">{currency(totalCotizacion(cotizacion.items))}</p>
+                <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+                  <Button className="w-full" variant="secondary" onClick={() => downloadCotizacionPdf(cotizacion, cliente?.nombre ?? "Cliente", motoLabel)}>
                     Descargar PDF
                   </Button>
-                  <Button variant="danger" onClick={() => void removeCotizacion(cotizacion.id, cotizacion.folio)}>
+                  <Button className="w-full" variant="danger" onClick={() => void removeCotizacion(cotizacion.id, cotizacion.folio)}>
                     <Trash2 className="h-4 w-4" /> Eliminar
                   </Button>
                 </div>
