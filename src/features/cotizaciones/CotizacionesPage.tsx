@@ -1,17 +1,19 @@
 import { jsPDF } from "jspdf";
-import { Trash2 } from "lucide-react";
+import { Download, Plus, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { useWorkshopStore } from "@/stores/workshopStore";
 import type { Cotizacion, CotizacionItem } from "@/types/motoflow";
 import { currency, uid } from "@/utils/format";
+import { includesSearch, isWithinDateFilter } from "@/utils/search";
 
 const CLAUSULA_DEFAULT =
-  "Este presupuesto es informativo y puede cambiar despues de la revision interna de la motocicleta. Si durante la inspeccion se detectan piezas dañadas, refacciones adicionales, mano de obra extra o condiciones no visibles al momento de cotizar, el taller notificara al cliente para su autorizacion antes de continuar.";
+  "Este presupuesto es informativo y puede cambiar despues de la revision interna de la motocicleta. Si durante la inspeccion se detectan piezas danadas, refacciones adicionales, mano de obra extra o condiciones no visibles al momento de cotizar, el taller notificara al cliente para su autorizacion antes de continuar.";
 
 function totalCotizacion(items: CotizacionItem[]) {
   return items.reduce((sum, item) => sum + item.cantidad * item.precio_unitario, 0);
@@ -24,7 +26,7 @@ function downloadCotizacionPdf(cotizacion: Cotizacion, cliente: string, moto?: s
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("MotoFlow - Cotizacion", 14, y);
+  doc.text("Taller Villa - Cotizacion", 14, y);
   y += 10;
 
   doc.setFontSize(10);
@@ -105,9 +107,40 @@ export function CotizacionesPage() {
     { id: uid("item"), concepto: "Servicio o refaccion", cantidad: 1, precio_unitario: 0, proveedor: "" },
   ]);
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [query, setQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const motosCliente = motocicletas.filter((moto) => moto.cliente_id === clienteId);
   const total = useMemo(() => totalCotizacion(items), [items]);
+
+  const filteredCotizaciones = useMemo(() => {
+    return cotizaciones
+      .filter((cotizacion) => {
+        const cliente = getCliente(cotizacion.cliente_id);
+        const moto = cotizacion.moto_id ? getMoto(cotizacion.moto_id) : undefined;
+        const motoLabel = moto ? `${moto.marca} ${moto.modelo} ${moto.placas}` : "";
+        return (
+          (!statusFilter || cotizacion.estado === statusFilter) &&
+          isWithinDateFilter(cotizacion.created_at, dateFilter) &&
+          includesSearch(
+            [
+              cotizacion.folio,
+              cotizacion.titulo,
+              cotizacion.estado,
+              cotizacion.fecha,
+              cliente?.nombre,
+              cliente?.telefono,
+              motoLabel,
+              ...cotizacion.items.flatMap((item) => [item.concepto, item.proveedor]),
+            ],
+            query,
+          )
+        );
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [cotizaciones, dateFilter, getCliente, getMoto, query, statusFilter]);
 
   function updateItem(id: string, patch: Partial<CotizacionItem>) {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -130,21 +163,31 @@ export function CotizacionesPage() {
     });
 
     setSaving(false);
+    setShowForm(false);
     event.currentTarget.reset();
     setItems([{ id: uid("item"), concepto: "Servicio o refaccion", cantidad: 1, precio_unitario: 0, proveedor: "" }]);
   }
 
   async function removeCotizacion(id: string, folio: string) {
-    if (!window.confirm(`¿Eliminar cotizacion ${folio}?`)) return;
+    if (!window.confirm(`Eliminar cotizacion ${folio}?`)) return;
     const result = await deleteCotizacion(id);
     if (!result.ok) window.alert(result.message);
   }
 
   return (
-    <div className="min-w-0">
-      <PageHeader title="Cotizaciones" subtitle="Presupuestos para servicios, refacciones o revisiones antes de autorizar el trabajo." />
+    <div className="min-w-0 space-y-4">
+      <PageHeader
+        title="Cotizaciones"
+        subtitle="Presupuestos para servicios, refacciones o revisiones antes de autorizar el trabajo."
+        actions={
+          <Button type="button" onClick={() => setShowForm((value) => !value)}>
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? "Cerrar" : "Nueva cotizacion"}
+          </Button>
+        }
+      />
 
-      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+      {showForm ? (
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Nueva cotizacion</h2>
           <form className="grid gap-4" onSubmit={save}>
@@ -227,39 +270,91 @@ export function CotizacionesPage() {
             <Button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar cotizacion"}</Button>
           </form>
         </Card>
+      ) : null}
 
-        <aside className="min-w-0 space-y-3">
-          <h2 className="text-sm font-semibold uppercase text-[#FFF2E1]/60">Cotizaciones recientes</h2>
-          {cotizaciones.length === 0 ? <Card><p className="text-sm text-[#FFF2E1]/60">Aun no hay cotizaciones guardadas.</p></Card> : null}
-          {cotizaciones.map((cotizacion) => {
-            const cliente = getCliente(cotizacion.cliente_id);
-            const moto = cotizacion.moto_id ? getMoto(cotizacion.moto_id) : undefined;
-            const motoLabel = moto ? `${moto.marca} ${moto.modelo} ${moto.placas}` : "Sin moto";
-            return (
-              <Card key={cotizacion.id}>
-                <div className="flex min-w-0 items-start justify-between gap-3">
+      <Card>
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_170px_170px]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#FFF2E1]/45" />
+            <Input className="pl-10" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por folio, cliente, moto, concepto..." />
+          </div>
+          <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrar cotizaciones por estado">
+            <option value="">Todos los estados</option>
+            <option value="borrador">Borrador</option>
+            <option value="enviada">Enviada</option>
+            <option value="autorizada">Autorizada</option>
+            <option value="rechazada">Rechazada</option>
+          </Select>
+          <Select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} aria-label="Filtrar cotizaciones por fecha">
+            <option value="">Todas las fechas</option>
+            <option value="today">Hoy</option>
+            <option value="week">Ultimos 7 dias</option>
+            <option value="month">Ultimo mes</option>
+          </Select>
+        </div>
+        <p className="mt-3 text-xs font-semibold text-[#FFF2E1]/58">
+          {filteredCotizaciones.length} de {cotizaciones.length} cotizaciones
+        </p>
+      </Card>
+
+      {cotizaciones.length === 0 ? <EmptyState title="Aun no hay cotizaciones" /> : null}
+
+      {filteredCotizaciones.length > 0 ? (
+        <Card className="p-0">
+          <div className="hidden border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase text-[#FFF2E1]/50 lg:grid lg:grid-cols-[110px_minmax(0,1.2fr)_minmax(0,1fr)_130px_120px_210px] lg:gap-3">
+            <span>Folio</span>
+            <span>Cliente / moto</span>
+            <span>Concepto</span>
+            <span>Estado</span>
+            <span>Total</span>
+            <span className="text-right">Acciones</span>
+          </div>
+
+          <div className="divide-y divide-white/10">
+            {filteredCotizaciones.map((cotizacion) => {
+              const cliente = getCliente(cotizacion.cliente_id);
+              const moto = cotizacion.moto_id ? getMoto(cotizacion.moto_id) : undefined;
+              const motoLabel = moto ? `${moto.marca} ${moto.modelo} ${moto.placas}` : "Sin moto";
+              const totalRow = totalCotizacion(cotizacion.items);
+
+              return (
+                <article key={cotizacion.id} className="grid gap-3 p-4 transition hover:bg-white/[0.04] lg:grid-cols-[110px_minmax(0,1.2fr)_minmax(0,1fr)_130px_120px_210px] lg:items-center">
+                  <p className="break-words font-semibold text-white">{cotizacion.folio}</p>
+
                   <div className="min-w-0">
-                    <p className="break-words font-semibold">{cotizacion.folio}</p>
-                    <p className="truncate text-sm text-[#FFF2E1]/60">{cliente?.nombre}</p>
-                    <p className="truncate text-sm text-[#FFF2E1]/60">{motoLabel}</p>
+                    <p className="truncate text-sm font-semibold text-[#FFF2E1]">{cliente?.nombre ?? "Sin cliente"}</p>
+                    <p className="truncate text-sm text-[#FFF2E1]/58">{motoLabel}</p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#F2B705]/10 px-2.5 py-1 text-xs font-semibold text-[#FFF2E1]">{cotizacion.estado}</span>
-                </div>
-                <p className="mt-3 break-words text-sm font-semibold">{cotizacion.titulo}</p>
-                <p className="break-words text-lg font-semibold">{currency(totalCotizacion(cotizacion.items))}</p>
-                <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-                  <Button className="w-full" variant="secondary" onClick={() => downloadCotizacionPdf(cotizacion, cliente?.nombre ?? "Cliente", motoLabel)}>
-                    Descargar PDF
-                  </Button>
-                  <Button className="w-full" variant="danger" onClick={() => void removeCotizacion(cotizacion.id, cotizacion.folio)}>
-                    <Trash2 className="h-4 w-4" /> Eliminar
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </aside>
-      </div>
+
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-semibold text-white">{cotizacion.titulo}</p>
+                    <p className="truncate text-xs text-[#FFF2E1]/55">{cotizacion.fecha}</p>
+                  </div>
+
+                  <div>
+                    <span className="inline-flex rounded-full bg-[#2F2A24] px-2.5 py-1 text-xs font-semibold text-[#FFF2E1]">
+                      {cotizacion.estado}
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-semibold text-[#FFD08A]">{currency(totalRow)}</p>
+
+                  <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:flex lg:justify-end">
+                    <Button className="w-full lg:w-auto" variant="secondary" onClick={() => downloadCotizacionPdf(cotizacion, cliente?.nombre ?? "Cliente", motoLabel)}>
+                      <Download className="h-4 w-4" /> PDF
+                    </Button>
+                    <Button className="w-full lg:w-auto" variant="danger" onClick={() => void removeCotizacion(cotizacion.id, cotizacion.folio)}>
+                      <Trash2 className="h-4 w-4" /> Eliminar
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
+      {cotizaciones.length > 0 && filteredCotizaciones.length === 0 ? <EmptyState title="No encontramos cotizaciones con esos filtros" /> : null}
     </div>
   );
 }

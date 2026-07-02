@@ -63,8 +63,10 @@ export function ClientesPage() {
           <span className="min-w-0 break-words">{notice}</span>
         </div>
       ) : null}
+
       <PageHeader title="Clientes" subtitle="Directorio del taller." actions={<Link to="/clientes/nuevo"><Button>Nuevo cliente</Button></Link>} />
       {clientes.length === 0 ? <EmptyState title="Aun no hay clientes" /> : null}
+
       {clientes.length > 0 ? (
         <Card className="mb-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -84,27 +86,51 @@ export function ClientesPage() {
           </p>
         </Card>
       ) : null}
-      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {filteredClientes.map((cliente) => {
-          const motosCliente = motocicletas.filter((moto) => moto.cliente_id === cliente.id).length;
-          return (
-            <Card key={cliente.id} className="h-full transition hover:border-[#F2B705]/30 hover:bg-white/[0.09]">
-              <p className="break-words text-lg font-semibold">{cliente.nombre}</p>
-              <p className="mt-1 break-words text-sm text-[#FFF2E1]/60">{cliente.telefono}</p>
-              <p className="break-words text-sm text-[#FFF2E1]/60">{cliente.localidad || "Sin localidad"}</p>
-              <p className="mt-4 text-sm font-semibold">{motosCliente} motos</p>
-              <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
-                <Link to={`/clientes/${cliente.id}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-3 text-sm font-semibold text-[#FFF2E1] transition hover:border-[#F2B705]/35 hover:bg-white/12 active:scale-[0.98]">
-                  <Eye className="h-4 w-4 shrink-0" /> Ver
-                </Link>
-                <Button type="button" variant="danger" className="w-full" onClick={() => void removeCliente(cliente.id, cliente.nombre)}>
-                  <Trash2 className="h-4 w-4 shrink-0" /> Eliminar
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+
+      {filteredClientes.length > 0 ? (
+        <Card className="p-0">
+          <div className="hidden border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase text-[#FFF2E1]/50 lg:grid lg:grid-cols-[minmax(0,1.2fr)_160px_minmax(0,1fr)_110px_190px] lg:gap-3">
+            <span>Cliente</span>
+            <span>Telefono</span>
+            <span>Localidad</span>
+            <span>Motos</span>
+            <span className="text-right">Acciones</span>
+          </div>
+
+          <div className="divide-y divide-white/10">
+            {filteredClientes.map((cliente) => {
+              const motosCliente = motocicletas.filter((moto) => moto.cliente_id === cliente.id);
+              return (
+                <article key={cliente.id} className="grid gap-3 p-4 transition hover:bg-white/[0.04] lg:grid-cols-[minmax(0,1.2fr)_160px_minmax(0,1fr)_110px_190px] lg:items-center">
+                  <div className="min-w-0">
+                    <p className="break-words text-lg font-semibold text-white lg:text-base">{cliente.nombre}</p>
+                    <p className="mt-1 line-clamp-1 text-sm text-[#FFF2E1]/58 lg:hidden">{cliente.localidad || "Sin localidad"}</p>
+                  </div>
+
+                  <p className="break-words text-sm font-semibold text-[#FFF2E1]/78">{cliente.telefono}</p>
+                  <p className="break-words text-sm text-[#FFF2E1]/65">{cliente.localidad || "Sin localidad"}</p>
+
+                  <div>
+                    <span className="inline-flex rounded-full bg-[#2F2A24] px-2.5 py-1 text-xs font-semibold text-[#FFF2E1]">
+                      {motosCliente.length} motos
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:flex lg:justify-end">
+                    <Link to={`/clientes/${cliente.id}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-3 text-sm font-semibold text-[#FFF2E1] transition hover:border-[#F2B705]/35 hover:bg-white/12 active:scale-[0.98]">
+                      <Eye className="h-4 w-4 shrink-0" /> Ver
+                    </Link>
+                    <Button type="button" variant="danger" className="w-full lg:w-auto" onClick={() => void removeCliente(cliente.id, cliente.nombre)}>
+                      <Trash2 className="h-4 w-4 shrink-0" /> Eliminar
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
       {clientes.length > 0 && filteredClientes.length === 0 ? <EmptyState title="No encontramos clientes con esos filtros" /> : null}
     </div>
   );
