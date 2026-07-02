@@ -114,7 +114,7 @@ export function PortalClientePage() {
         <div className="mb-6">
           <p className="text-sm font-semibold text-[#8A6400]">MotoFlow</p>
           <h1 className="text-3xl font-semibold text-[#0B0B0B]">Consulta tu motocicleta</h1>
-          <p className="mt-2 text-sm text-[#2F2A24]/75">Ingresa tus placas, nombre o numero de serie para ver la bitacora publica.</p>
+          <p className="mt-2 text-sm text-[#2F2A24]/75">Ingresa tus placas, nombre o numero de serie para ver los avances publicos.</p>
         </div>
 
         <Card className={`mb-5 ${lightCard}`}>
@@ -149,7 +149,7 @@ export function PortalClientePage() {
             </Card>
 
             <Card className={lightCard}>
-              <h2 className="mb-3 text-lg font-semibold text-[#0B0B0B]">Bitacora y avances</h2>
+              <h2 className="mb-3 text-lg font-semibold text-[#0B0B0B]">Avances del trabajo</h2>
               <div className="space-y-3">
                 {data.movimientos.length === 0 ? <p className="text-sm text-[#2F2A24]/70">Aun no hay avances visibles para el cliente.</p> : null}
                 {data.movimientos.map((movimiento) => (

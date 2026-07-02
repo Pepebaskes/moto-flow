@@ -22,8 +22,8 @@ export function MotoCreatePage() {
 
   return (
     <>
-      <PageHeader title="Nueva motocicleta" subtitle="Al guardar se crea automaticamente la primera bitacora: recibida dentro del taller." />
-      <Card><MotoForm onSubmit={async (data) => { await addMoto(data); navigate("/bitacoras"); }} /></Card>
+      <PageHeader title="Nueva motocicleta" subtitle="Registra solo la ficha de la unidad. El trabajo, diagnostico y avances se llevan despues en Trabajos activos." />
+      <Card><MotoForm onSubmit={async (data) => { await addMoto(data); navigate("/bitacoras", { state: { notice: "Motocicleta registrada correctamente. Se creo su ingreso de taller." } }); }} /></Card>
     </>
   );
 }
@@ -59,7 +59,7 @@ export function MotoDetailPage() {
         subtitle={`Placas ${moto.placas} | ${cliente?.nombre ?? "Sin cliente"}`}
         actions={
           <>
-            <Link to="/bitacoras"><Button variant="secondary">Abrir bitacora</Button></Link>
+            <Link to="/bitacoras"><Button variant="secondary">Abrir trabajo</Button></Link>
             <Button type="button" variant="danger" onClick={() => void removeMoto()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button>
           </>
         }
@@ -97,7 +97,7 @@ export function MotoDetailPage() {
         <Card>
           <h2 className="mb-3 text-lg font-semibold text-white">Historial de la moto</h2>
           <div className="space-y-2">
-            {historialMoto.length === 0 ? <p className="text-sm text-[#FFF2E1]/60">Aun no hay bitacora registrada.</p> : null}
+            {historialMoto.length === 0 ? <p className="text-sm text-[#FFF2E1]/60">Aun no hay movimientos registrados.</p> : null}
             {historialMoto.map((movimiento) => (
               <div key={movimiento.id} className="min-w-0 rounded-2xl border border-white/10 bg-[#151515] p-3">
                 <p className="break-words font-semibold text-white">{movimiento.titulo || "Actualizacion"}</p>

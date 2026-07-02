@@ -1,4 +1,4 @@
-import { Bike, BookOpen, FileText, Home, LogOut, Menu, Users, X } from "lucide-react";
+import { Bike, BookOpen, FileClock, FileText, Home, LogOut, Menu, Users, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { AuthPage } from "@/features/auth/AuthPage";
@@ -10,7 +10,8 @@ const nav = [
   { to: "/", label: "Inicio", icon: Home },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/motocicletas", label: "Motos", icon: Bike },
-  { to: "/bitacoras", label: "Bitacoras", icon: BookOpen },
+  { to: "/bitacoras", label: "Trabajos", icon: BookOpen },
+  { to: "/historial", label: "Historial", icon: FileClock },
   { to: "/cotizaciones", label: "Cotizaciones", icon: FileText },
 ];
 
@@ -60,7 +61,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-[#FFF2E1]/75">
         <p className="font-semibold text-white">Flujo activo</p>
-        <p className="mt-1">Cliente, moto, bitacora y cotizacion en un solo expediente.</p>
+        <p className="mt-1">Cliente, moto, trabajo activo, historial y cotizacion en un solo expediente.</p>
       </div>
     </div>
   );

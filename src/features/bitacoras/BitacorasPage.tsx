@@ -1,13 +1,16 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, FileClock, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, CalendarDays, CheckCircle2, FileClock, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { useWorkshopStore } from "@/stores/workshopStore";
 import type { MovimientoOrden } from "@/types/motoflow";
 import { currency, shortDate } from "@/utils/format";
+import { includesSearch, isWithinDateFilter, normalizeSearch } from "@/utils/search";
+import { estadoOperativoLabels, estadosOperativos, isTrabajoActivo, prioridadTrabajoLabels, prioridadesTrabajo, priorityTone, tamanoTrabajoLabels, tamanosTrabajo, tipoTrabajoLabels, tiposTrabajo } from "@/utils/workflow";
 
 type Tab = "avance" | "fecha" | "historial";
 
@@ -44,6 +47,11 @@ export function BitacorasPage() {
   const [saving, setSaving] = useState(false);
   const [savingDate, setSavingDate] = useState(false);
   const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const bitacoras = useMemo(() => {
     return store.motocicletas
@@ -81,6 +89,43 @@ export function BitacorasPage() {
     window.setTimeout(() => setNotice(""), 2800);
   }
 
+  const marcas = useMemo(() => {
+    return Array.from(new Set(store.motocicletas.map((moto) => moto.marca).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }, [store.motocicletas]);
+
+  const filteredBitacoras = useMemo(() => {
+    return bitacoras.filter((item) => {
+      const matchesBrand = !brandFilter || normalizeSearch(item.moto.marca) === normalizeSearch(brandFilter);
+      return (
+        isTrabajoActivo(item.moto, item.historial) &&
+        matchesBrand &&
+        isWithinDateFilter(item.moto.created_at, dateFilter) &&
+        includesSearch(
+          [
+            item.moto.marca,
+            item.moto.modelo,
+            item.moto.anio,
+            item.moto.placas,
+            item.moto.color,
+            item.moto.numero_serie,
+            item.cliente?.nombre,
+            item.cliente?.telefono,
+            item.ultima?.titulo,
+            item.ultima?.nota,
+          ],
+          query,
+        )
+      );
+    });
+  }, [bitacoras, brandFilter, dateFilter, query]);
+
+  useEffect(() => {
+    const state = location.state as { notice?: string } | null;
+    if (!state?.notice) return;
+    showNotice(state.notice);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
+
   function openMoto(id: string) {
     setMotoId(id);
     setTab("avance");
@@ -94,7 +139,7 @@ export function BitacorasPage() {
   }
 
   async function removeMovimiento(id: string, titulo: string) {
-    if (!window.confirm(`Eliminar bitacora "${titulo}"?`)) return;
+    if (!window.confirm(`Eliminar movimiento "${titulo}"?`)) return;
     const result = await store.deleteMovimiento(id);
     if (!result.ok) window.alert(result.message);
   }
@@ -107,12 +152,23 @@ export function BitacorasPage() {
     const form = new FormData(event.currentTarget);
     const tipo = form.get("tipo") as MovimientoOrden["tipo"];
     const publico = form.get("publico") === "on";
+    const estado_operativo = String(form.get("estado_operativo") || moto.estado_operativo || "en_trabajo") as NonNullable<typeof moto.estado_operativo>;
+    const prioridad_trabajo = String(form.get("prioridad_trabajo") || moto.prioridad_trabajo || "media") as NonNullable<typeof moto.prioridad_trabajo>;
+    const tipo_trabajo = String(form.get("tipo_trabajo") || moto.tipo_trabajo || "diagnostico") as NonNullable<typeof moto.tipo_trabajo>;
+    const tamano_trabajo = String(form.get("tamano_trabajo") || moto.tamano_trabajo || "medio") as NonNullable<typeof moto.tamano_trabajo>;
     const fotos = form
       .getAll("fotos")
       .filter((file): file is File => file instanceof File && file.size > 0);
 
     setSaving(true);
     try {
+      await store.updateMotoTrabajo(moto.id, {
+        estado_operativo: tipo === "salida" ? "entregada" : estado_operativo,
+        prioridad_trabajo,
+        tipo_trabajo,
+        tamano_trabajo,
+      });
+
       const movimiento = await store.addMovimiento({
         moto_id: moto.id,
         tipo,
@@ -130,7 +186,7 @@ export function BitacorasPage() {
               moto_id: moto.id,
               movimiento_id: movimiento.id,
               tipo: tipo === "salida" ? "salida" : tipo === "entrada" ? "entrada" : "proceso",
-              nota: String(form.get("titulo") || "Foto de bitacora"),
+              nota: String(form.get("titulo") || "Foto de trabajo"),
               publico,
               file,
             }),
@@ -139,10 +195,10 @@ export function BitacorasPage() {
       }
 
       formElement.reset();
-      showNotice(fotos.length > 0 ? `Bitacora agregada correctamente con ${fotos.length} foto(s).` : "Bitacora agregada correctamente.");
+      showNotice(fotos.length > 0 ? `Trabajo actualizado correctamente con ${fotos.length} foto(s).` : "Trabajo actualizado correctamente.");
       setTab("historial");
     } catch (error) {
-      showNotice(error instanceof Error ? error.message : "No se pudo guardar la bitacora.");
+      showNotice(error instanceof Error ? error.message : "No se pudo guardar el trabajo.");
     } finally {
       setSaving(false);
     }
@@ -163,24 +219,51 @@ export function BitacorasPage() {
     return (
       <div className="space-y-5">
         <PageHeader
-          title="Bitacoras"
-          subtitle="Primero elige una moto. Al abrirla se muestra su expediente, formulario e historial sin amontonar la pantalla."
+          title="Trabajos activos"
+          subtitle="Primero elige una moto. Aqui se agrega diagnostico, prioridad, avances, fotos, costos y salida."
           actions={
-            <Link to="/motocicletas/nueva">
-              <Button>Registrar moto</Button>
-            </Link>
+            <>
+              <Link to="/historial"><Button variant="secondary">Ver historial</Button></Link>
+              <Link to="/motocicletas/nueva">
+                <Button>Registrar moto</Button>
+              </Link>
+            </>
           }
         />
 
         {bitacoras.length === 0 ? (
           <Card>
-            <p className="font-semibold text-white">Todavia no hay bitacoras.</p>
-            <p className="mt-1 text-sm text-[#FFF2E1]/70">Registra una moto y el sistema creara la primera entrada automaticamente.</p>
+            <p className="font-semibold text-white">Todavia no hay trabajos activos.</p>
+            <p className="mt-1 text-sm text-[#FFF2E1]/70">Registra una moto y el sistema creara su ingreso automaticamente.</p>
+          </Card>
+        ) : null}
+
+        {bitacoras.length > 0 ? (
+          <Card>
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#FFF2E1]/45" />
+                <Input className="pl-10" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por placas, cliente, moto o avance..." />
+              </div>
+              <Select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} aria-label="Filtrar trabajos por marca">
+                <option value="">Todas las marcas</option>
+                {marcas.map((marca) => <option key={marca} value={marca}>{marca}</option>)}
+              </Select>
+              <Select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} aria-label="Filtrar trabajos por fecha">
+                <option value="">Todas las fechas</option>
+                <option value="today">Registradas hoy</option>
+                <option value="week">Ultimos 7 dias</option>
+                <option value="month">Ultimo mes</option>
+              </Select>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-[#FFF2E1]/58">
+              {filteredBitacoras.length} trabajos activos de {bitacoras.length} expedientes
+            </p>
           </Card>
         ) : null}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {bitacoras.map((item) => (
+          {filteredBitacoras.map((item) => (
             <button
               key={item.moto.id}
               type="button"
@@ -197,13 +280,15 @@ export function BitacorasPage() {
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#F2B705] px-2.5 py-1 text-xs font-semibold text-[#0B0B0B]">
-                  {item.historial.length}
+                  {prioridadTrabajoLabels[item.moto.prioridad_trabajo ?? "media"]}
                 </span>
               </div>
 
               <div className="mt-4 rounded-2xl bg-[#2F2A24] p-3">
                 <p className="truncate text-sm font-semibold text-white">{item.cliente?.nombre ?? "Sin cliente"}</p>
-                <p className="mt-1 text-xs text-[#FFF2E1]/68">{item.moto.kilometraje.toLocaleString()} km</p>
+                <p className="mt-1 text-xs text-[#FFF2E1]/68">
+                  {estadoOperativoLabels[item.moto.estado_operativo ?? "recibida"]} | {item.moto.kilometraje.toLocaleString()} km
+                </p>
               </div>
 
               <div className="mt-3 rounded-2xl border border-white/10 bg-[#0B0B0B] p-3">
@@ -213,6 +298,7 @@ export function BitacorasPage() {
             </button>
           ))}
         </div>
+        {bitacoras.length > 0 && filteredBitacoras.length === 0 ? <EmptyState title="No encontramos trabajos activos con esos filtros" /> : null}
       </div>
     );
   }
@@ -252,6 +338,17 @@ export function BitacorasPage() {
             <p className="mt-2 text-sm font-semibold text-[#FFF2E1]">
               {cliente?.nombre ?? "Sin cliente"} {cliente?.telefono ? `| ${cliente.telefono}` : ""}
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${priorityTone(moto.prioridad_trabajo ?? "media")}`}>
+                {prioridadTrabajoLabels[moto.prioridad_trabajo ?? "media"]}
+              </span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[#FFF2E1]/78">
+                {estadoOperativoLabels[moto.estado_operativo ?? "recibida"]}
+              </span>
+              <span className="rounded-full bg-[#2F2A24] px-3 py-1 text-xs font-semibold text-[#FFD08A]">
+                {tipoTrabajoLabels[moto.tipo_trabajo ?? "diagnostico"]}
+              </span>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[420px]">
             <div className="rounded-2xl bg-[#2F2A24] p-3">
@@ -292,7 +389,7 @@ export function BitacorasPage() {
 
       {tab === "avance" ? (
         <Card>
-          <h2 className="mb-4 text-xl font-semibold text-white">Agregar avance</h2>
+          <h2 className="mb-4 text-xl font-semibold text-white">Actualizar trabajo</h2>
           <form className="grid gap-4" onSubmit={saveBitacora}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Tipo">
@@ -309,8 +406,31 @@ export function BitacorasPage() {
               </Field>
             </div>
 
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Field label="Prioridad">
+                <Select name="prioridad_trabajo" defaultValue={moto.prioridad_trabajo ?? "media"}>
+                  {prioridadesTrabajo.map((item) => <option key={item} value={item}>{prioridadTrabajoLabels[item]}</option>)}
+                </Select>
+              </Field>
+              <Field label="Estado">
+                <Select name="estado_operativo" defaultValue={moto.estado_operativo ?? "en_trabajo"}>
+                  {estadosOperativos.map((item) => <option key={item} value={item}>{estadoOperativoLabels[item]}</option>)}
+                </Select>
+              </Field>
+              <Field label="Tipo de trabajo">
+                <Select name="tipo_trabajo" defaultValue={moto.tipo_trabajo ?? "diagnostico"}>
+                  {tiposTrabajo.map((item) => <option key={item} value={item}>{tipoTrabajoLabels[item]}</option>)}
+                </Select>
+              </Field>
+              <Field label="Tamano">
+                <Select name="tamano_trabajo" defaultValue={moto.tamano_trabajo ?? "medio"}>
+                  {tamanosTrabajo.map((item) => <option key={item} value={item}>{tamanoTrabajoLabels[item]}</option>)}
+                </Select>
+              </Field>
+            </div>
+
             <Field label="Titulo">
-              <Input name="titulo" placeholder="Ej. Diagnosticando moto, cambio de balatas..." required />
+              <Input name="titulo" placeholder="Ej. Diagnostico inicial, cambio de balatas, prueba final..." required />
             </Field>
 
             <div className="rounded-2xl border border-white/10 bg-[#2F2A24] p-3 text-xs leading-5 text-[#FFF2E1]/75">
@@ -339,7 +459,7 @@ export function BitacorasPage() {
               Visible para el cliente
             </label>
 
-            <Button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar avance"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar trabajo"}</Button>
           </form>
         </Card>
       ) : null}
@@ -360,7 +480,7 @@ export function BitacorasPage() {
 
       {tab === "historial" ? (
         <Card>
-          <h2 className="mb-4 text-xl font-semibold text-white">Historial de la moto</h2>
+          <h2 className="mb-4 text-xl font-semibold text-white">Historial del trabajo</h2>
           <div className="space-y-3">
             {historial.length === 0 ? <p className="text-sm text-[#FFF2E1]/70">Aun no hay entradas para esta moto.</p> : null}
             {historial.map((movimiento) => (
@@ -378,7 +498,7 @@ export function BitacorasPage() {
                       type="button"
                       className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-500/12 text-red-200 transition hover:bg-red-500 hover:text-white active:scale-95"
                       onClick={() => void removeMovimiento(movimiento.id, movimiento.titulo)}
-                      aria-label="Eliminar bitacora"
+                      aria-label="Eliminar movimiento"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

@@ -55,6 +55,10 @@ create table if not exists public.motocicletas (
   color text not null,
   kilometraje int not null default 0,
   fecha_estimada_salida date,
+  prioridad_trabajo text not null default 'media',
+  tipo_trabajo text not null default 'diagnostico',
+  estado_operativo text not null default 'recibida',
+  tamano_trabajo text not null default 'medio',
   numero_serie text,
   notas text,
   created_at timestamptz not null default now(),
@@ -155,6 +159,10 @@ alter table public.movimientos_orden add column if not exists publico boolean no
 alter table public.movimientos_orden add column if not exists costo numeric(12,2);
 alter table public.movimientos_orden add column if not exists kilometraje int;
 alter table public.motocicletas add column if not exists fecha_estimada_salida date;
+alter table public.motocicletas add column if not exists prioridad_trabajo text not null default 'media';
+alter table public.motocicletas add column if not exists tipo_trabajo text not null default 'diagnostico';
+alter table public.motocicletas add column if not exists estado_operativo text not null default 'recibida';
+alter table public.motocicletas add column if not exists tamano_trabajo text not null default 'medio';
 alter table public.evidencias alter column orden_id drop not null;
 alter table public.evidencias add column if not exists moto_id uuid references public.motocicletas(id) on delete cascade;
 alter table public.evidencias add column if not exists movimiento_id uuid references public.movimientos_orden(id) on delete cascade;

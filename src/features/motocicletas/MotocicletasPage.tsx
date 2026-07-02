@@ -1,13 +1,19 @@
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Search, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
+import { Input, Select } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { useWorkshopStore } from "@/stores/workshopStore";
+import { includesSearch, isWithinDateFilter, normalizeSearch } from "@/utils/search";
 
 export function MotocicletasPage() {
   const { motocicletas, getCliente, deleteMoto } = useWorkshopStore();
+  const [query, setQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   async function removeMoto(id: string, nombre: string) {
     if (!window.confirm(`Eliminar moto ${nombre}?`)) return;
@@ -15,13 +21,57 @@ export function MotocicletasPage() {
     if (!result.ok) window.alert(result.message);
   }
 
+  const marcas = useMemo(() => {
+    return Array.from(new Set(motocicletas.map((moto) => moto.marca).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }, [motocicletas]);
+
+  const filteredMotos = useMemo(() => {
+    return motocicletas
+      .filter((moto) => {
+        const cliente = getCliente(moto.cliente_id);
+        const matchesBrand = !brandFilter || normalizeSearch(moto.marca) === normalizeSearch(brandFilter);
+        return (
+          matchesBrand &&
+          isWithinDateFilter(moto.created_at, dateFilter) &&
+          includesSearch(
+            [moto.marca, moto.modelo, moto.anio, moto.placas, moto.color, moto.kilometraje, moto.numero_serie, moto.notas, cliente?.nombre, cliente?.telefono],
+            query,
+          )
+        );
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [brandFilter, dateFilter, getCliente, motocicletas, query]);
+
   return (
     <div className="min-w-0">
       <PageHeader title="Motocicletas" subtitle="Unidades registradas en el taller." actions={<Link to="/motocicletas/nueva"><Button>Nueva moto</Button></Link>} />
       {motocicletas.length === 0 ? <EmptyState title="Aun no hay motocicletas" /> : null}
+      {motocicletas.length > 0 ? (
+        <Card className="mb-4">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#FFF2E1]/45" />
+              <Input className="pl-10" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por placas, marca, modelo, cliente, serie..." />
+            </div>
+            <Select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} aria-label="Filtrar por marca">
+              <option value="">Todas las marcas</option>
+              {marcas.map((marca) => <option key={marca} value={marca}>{marca}</option>)}
+            </Select>
+            <Select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} aria-label="Filtrar motos por fecha">
+              <option value="">Todas las fechas</option>
+              <option value="today">Registradas hoy</option>
+              <option value="week">Ultimos 7 dias</option>
+              <option value="month">Ultimo mes</option>
+            </Select>
+          </div>
+          <p className="mt-3 text-xs font-semibold text-[#FFF2E1]/58">
+            {filteredMotos.length} de {motocicletas.length} motocicletas
+          </p>
+        </Card>
+      ) : null}
 
       <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {motocicletas.map((moto) => (
+        {filteredMotos.map((moto) => (
           <Card key={moto.id} className="h-full transition hover:border-[#F2B705]/30 hover:bg-white/[0.09]">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
@@ -60,6 +110,7 @@ export function MotocicletasPage() {
           </Card>
         ))}
       </div>
+      {motocicletas.length > 0 && filteredMotos.length === 0 ? <EmptyState title="No encontramos motos con esos filtros" /> : null}
     </div>
   );
 }

@@ -52,11 +52,11 @@ export function MotoForm({ initial, onSubmit }: { initial?: Motocicleta; onSubmi
         <Field label="Color" error={errors.color?.message}><Input {...register("color")} /></Field>
         <Field label="Kilometraje" error={errors.kilometraje?.message}><Input type="number" {...register("kilometraje")} /></Field>
       </div>
-      <Field label="Fecha estimada de salida">
+      <Field label="Fecha estimada inicial de salida">
         <Input type="date" {...register("fecha_estimada_salida")} />
       </Field>
       <Field label="Numero de serie opcional"><Input {...register("numero_serie")} /></Field>
-      <Field label="Notas"><Textarea {...register("notas")} /></Field>
+      <Field label="Notas de registro"><Textarea placeholder="Detalles de identificacion, condiciones generales o comentarios administrativos. El diagnostico va en Trabajos activos." {...register("notas")} /></Field>
       <Button type="submit">Guardar motocicleta</Button>
     </form>
   );

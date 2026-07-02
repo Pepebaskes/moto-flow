@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { mockData } from "@/lib/mockData";
 import { allowLocalMode, hasSupabaseCredentials, storageBucket, supabase } from "@/lib/supabase";
-import type { Cliente, Cotizacion, EstadoOrden, Evidencia, Motocicleta, MovimientoOrden, OrdenTrabajo, TipoEvidencia, WorkshopState } from "@/types/motoflow";
+import type { Cliente, Cotizacion, EstadoOperativo, EstadoOrden, Evidencia, Motocicleta, MovimientoOrden, OrdenTrabajo, PrioridadTrabajo, TamanoTrabajo, TipoEvidencia, TipoTrabajo, WorkshopState } from "@/types/motoflow";
 import { createPublicCode, uid } from "@/utils/format";
 
 type NewCliente = Omit<Cliente, "id" | "taller_id" | "created_at" | "updated_at">;
@@ -28,6 +28,7 @@ type Store = WorkshopState & {
   addMoto: (data: NewMoto) => Promise<void>;
   updateMoto: (id: string, data: NewMoto) => Promise<void>;
   updateMotoFechaEstimada: (id: string, fecha_estimada_salida: string) => Promise<void>;
+  updateMotoTrabajo: (id: string, data: { prioridad_trabajo?: PrioridadTrabajo; tipo_trabajo?: TipoTrabajo; estado_operativo?: EstadoOperativo; tamano_trabajo?: TamanoTrabajo }) => Promise<void>;
   deleteMoto: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addOrden: (data: NewOrden) => Promise<void>;
   addCotizacion: (data: NewCotizacion) => Promise<void>;
@@ -82,6 +83,25 @@ function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function withTrabajoDefaults<T extends Partial<Motocicleta>>(data: T) {
+  return {
+    ...data,
+    prioridad_trabajo: data.prioridad_trabajo ?? "media",
+    tipo_trabajo: data.tipo_trabajo ?? "diagnostico",
+    estado_operativo: data.estado_operativo ?? "recibida",
+    tamano_trabajo: data.tamano_trabajo ?? "medio",
+  };
+}
+
+function motoPayload(data: NewMoto) {
+  const payload = withTrabajoDefaults(data);
+  return {
+    ...payload,
+    fecha_estimada_salida: payload.fecha_estimada_salida || null,
+    numero_serie: payload.numero_serie || null,
+  };
 }
 
 async function requireTallerId(_current?: string) {
@@ -195,7 +215,7 @@ export const useWorkshopStore = create<Store>()(
       addMoto: async (data) => {
         if (supabase) {
           const taller_id = await requireTallerId(get().tallerId);
-          const moto = await insertRow<Motocicleta>("motocicletas", { ...data, fecha_estimada_salida: data.fecha_estimada_salida || null, numero_serie: data.numero_serie || null, taller_id });
+          const moto = await insertRow<Motocicleta>("motocicletas", { ...motoPayload(data), taller_id });
           if (moto) {
             const movimiento = await insertRow<MovimientoOrden>("movimientos_orden", {
               taller_id,
@@ -214,7 +234,7 @@ export const useWorkshopStore = create<Store>()(
           }
           return;
         }
-        const moto = withBase("moto", data);
+        const moto = withBase("moto", withTrabajoDefaults(data));
         const movimiento = withBase("mov", {
           moto_id: moto.id,
           tipo: "entrada" as const,
@@ -228,11 +248,25 @@ export const useWorkshopStore = create<Store>()(
 
       updateMoto: async (id, data) => {
         if (supabase) {
-          const moto = await updateRow<Motocicleta>("motocicletas", id, { ...data, fecha_estimada_salida: data.fecha_estimada_salida || null, numero_serie: data.numero_serie || null });
+          const current = get().motocicletas.find((moto) => moto.id === id);
+          const moto = await updateRow<Motocicleta>("motocicletas", id, motoPayload({ ...current, ...data }));
           if (moto) set((state) => ({ motocicletas: state.motocicletas.map((item) => (item.id === id ? moto : item)) }));
           return;
         }
-        set((state) => ({ motocicletas: state.motocicletas.map((moto) => (moto.id === id ? { ...moto, ...data, updated_at: stamp() } : moto)) }));
+        set((state) => ({ motocicletas: state.motocicletas.map((moto) => (moto.id === id ? { ...moto, ...withTrabajoDefaults(data), updated_at: stamp() } : moto)) }));
+      },
+
+      updateMotoTrabajo: async (id, data) => {
+        const payload = Object.fromEntries(Object.entries(data).filter(([, value]) => Boolean(value)));
+        if (Object.keys(payload).length === 0) return;
+
+        if (supabase) {
+          const moto = await updateRow<Motocicleta>("motocicletas", id, payload);
+          if (moto) set((state) => ({ motocicletas: state.motocicletas.map((item) => (item.id === id ? moto : item)) }));
+          return;
+        }
+
+        set((state) => ({ motocicletas: state.motocicletas.map((moto) => (moto.id === id ? { ...moto, ...payload, updated_at: stamp() } : moto)) }));
       },
 
       updateMotoFechaEstimada: async (id, fecha_estimada_salida) => {
@@ -263,7 +297,7 @@ export const useWorkshopStore = create<Store>()(
         const movimientosMoto = get().movimientos.filter((movimiento) => movimiento.moto_id === id);
         const cotizacionesMoto = get().cotizaciones.filter((cotizacion) => cotizacion.moto_id === id);
         if (movimientosMoto.length > 0 || cotizacionesMoto.length > 0) {
-          return { ok: false, message: "No puedes eliminar una moto con bitacoras o cotizaciones. Borra primero esos registros si realmente quieres quitarla." };
+          return { ok: false, message: "No puedes eliminar una moto con trabajos o cotizaciones. Borra primero esos registros si realmente quieres quitarla." };
         }
 
         if (supabase) await deleteRow("motocicletas", id);
@@ -428,9 +462,9 @@ export const useWorkshopStore = create<Store>()(
 
       deleteMovimiento: async (id) => {
         const movimiento = get().movimientos.find((item) => item.id === id);
-        if (!movimiento) return { ok: false, message: "No encontramos esa bitacora." };
+        if (!movimiento) return { ok: false, message: "No encontramos ese movimiento." };
         if (movimiento.tipo === "entrada" && movimiento.titulo.toLowerCase().includes("recibida dentro del taller")) {
-          return { ok: false, message: "La primera bitacora automatica no se elimina. Es el registro de ingreso de la moto." };
+          return { ok: false, message: "El ingreso automatico no se elimina. Es el registro de entrada de la moto." };
         }
 
         if (supabase) await deleteRow("movimientos_orden", id);

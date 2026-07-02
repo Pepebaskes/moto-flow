@@ -1,4 +1,8 @@
 export type PrioridadOrden = "baja" | "media" | "alta" | "urgente";
+export type PrioridadTrabajo = "baja" | "media" | "alta" | "urgente";
+export type TipoTrabajo = "servicio_rapido" | "diagnostico" | "reparacion" | "trabajo_mayor" | "esperando_refaccion" | "esperando_autorizacion";
+export type EstadoOperativo = "recibida" | "diagnosticando" | "cotizando" | "esperando_autorizacion" | "esperando_refaccion" | "en_trabajo" | "lista_para_entregar" | "entregada";
+export type TamanoTrabajo = "rapido" | "medio" | "largo" | "proyecto";
 
 export type EstadoOrden =
   | "recibida"
@@ -37,6 +41,10 @@ export type Motocicleta = BaseEntity & {
   color: string;
   kilometraje: number;
   fecha_estimada_salida?: string;
+  prioridad_trabajo?: PrioridadTrabajo;
+  tipo_trabajo?: TipoTrabajo;
+  estado_operativo?: EstadoOperativo;
+  tamano_trabajo?: TamanoTrabajo;
   numero_serie?: string;
   notas?: string;
 };

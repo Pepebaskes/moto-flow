@@ -79,7 +79,7 @@ Sin `.env`, la app funciona en modo local con `localStorage`.
 - `/` Dashboard
 - `/clientes` Clientes
 - `/motocicletas` Motocicletas
-- `/bitacoras` Bitacoras por moto
+- `/bitacoras` Trabajos activos por moto
 - `/cotizaciones` Cotizaciones
 - `/consulta` Portal publico del cliente
 - `/consulta/:codigo` Consulta por placas, nombre o numero de serie
@@ -88,8 +88,8 @@ Sin `.env`, la app funciona en modo local con `localStorage`.
 
 1. Registra el cliente en `/clientes`.
 2. Registra su motocicleta en `/motocicletas` con placas, kilometraje y datos de identificacion.
-3. Al guardar la moto, MotoFlow crea automaticamente su primera bitacora: `Recibida dentro del taller`, con fecha y hora.
-4. En `/bitacoras`, el mecanico abre la moto y registra entradas de entrada, proceso, salida, cotizacion o nota.
+3. Al guardar la moto, MotoFlow crea automaticamente su ingreso al taller, con fecha y hora.
+4. En `/bitacoras`, el mecanico abre el trabajo activo y registra diagnostico, prioridad, proceso, salida, cotizacion o nota.
 5. Cada entrada puede marcarse como visible para el cliente y puede sumar costo a la cotizacion acumulada.
 6. El cliente consulta el progreso en `/consulta` escribiendo sus placas, nombre o numero de serie.
 7. El detalle de cada motocicleta muestra su historial acumulado.

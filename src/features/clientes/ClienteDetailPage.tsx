@@ -11,7 +11,7 @@ export function ClienteCreatePage() {
   const navigate = useNavigate();
   const save = async (data: ClienteFormData) => {
     await addCliente(data);
-    navigate("/clientes");
+    navigate("/clientes", { state: { notice: "Cliente registrado correctamente." } });
   };
   return <><PageHeader title="Nuevo cliente" /><Card><ClienteForm onSubmit={save} /></Card></>;
 }

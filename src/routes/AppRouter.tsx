@@ -5,6 +5,7 @@ import { ClienteCreatePage, ClienteDetailPage } from "@/features/clientes/Client
 import { ClientesPage } from "@/features/clientes/ClientesPage";
 import { CotizacionesPage } from "@/features/cotizaciones/CotizacionesPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { HistorialPage } from "@/features/historial/HistorialPage";
 import { MotoCreatePage, MotoDetailPage } from "@/features/motocicletas/MotoDetailPage";
 import { MotocicletasPage } from "@/features/motocicletas/MotocicletasPage";
 import { PortalClientePage } from "@/features/portal-cliente/PortalClientePage";
@@ -24,6 +25,7 @@ function PrivateRoutes() {
         <Route path="/ordenes/nueva" element={<Navigate to="/bitacoras" replace />} />
         <Route path="/ordenes/:id" element={<Navigate to="/bitacoras" replace />} />
         <Route path="/bitacoras" element={<BitacorasPage />} />
+        <Route path="/historial" element={<HistorialPage />} />
         <Route path="/cotizaciones" element={<CotizacionesPage />} />
         <Route path="/kanban" element={<Navigate to="/bitacoras" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
