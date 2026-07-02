@@ -100,10 +100,13 @@ create table if not exists public.ordenes_trabajo (
 create table if not exists public.evidencias (
   id uuid primary key default gen_random_uuid(),
   taller_id uuid not null references public.talleres(id) on delete cascade,
-  orden_id uuid not null references public.ordenes_trabajo(id) on delete cascade,
+  orden_id uuid references public.ordenes_trabajo(id) on delete cascade,
+  moto_id uuid references public.motocicletas(id) on delete cascade,
+  movimiento_id uuid,
   url text not null,
   tipo public.tipo_evidencia not null,
   nota text,
+  publico boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -152,6 +155,10 @@ alter table public.movimientos_orden add column if not exists publico boolean no
 alter table public.movimientos_orden add column if not exists costo numeric(12,2);
 alter table public.movimientos_orden add column if not exists kilometraje int;
 alter table public.motocicletas add column if not exists fecha_estimada_salida date;
+alter table public.evidencias alter column orden_id drop not null;
+alter table public.evidencias add column if not exists moto_id uuid references public.motocicletas(id) on delete cascade;
+alter table public.evidencias add column if not exists movimiento_id uuid references public.movimientos_orden(id) on delete cascade;
+alter table public.evidencias add column if not exists publico boolean not null default true;
 
 create or replace function public.current_taller_id()
 returns uuid language sql stable security definer as $$
@@ -241,7 +248,20 @@ begin
     'evidencias', coalesce((
       select jsonb_agg(to_jsonb(e) order by e.created_at desc)
       from public.evidencias e
-      where e.orden_id in (select id from ordenes_moto)
+      where e.publico = true
+        and (
+          e.moto_id = m.id
+          or e.movimiento_id in (
+            select mo.id
+            from public.movimientos_orden mo
+            where mo.publico = true
+              and (
+                mo.moto_id = m.id
+                or mo.orden_id in (select id from ordenes_moto)
+              )
+          )
+          or e.orden_id in (select id from ordenes_moto)
+        )
     ), '[]'::jsonb)
   )
   into resultado

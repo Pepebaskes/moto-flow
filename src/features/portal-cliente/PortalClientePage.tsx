@@ -88,7 +88,13 @@ export function PortalClientePage() {
       movimientos: movimientos
         .filter((item) => item.publico && (item.moto_id === moto.id || Boolean(item.orden_id && ordenIds.includes(item.orden_id))))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
-      evidencias: evidencias.filter((item) => ordenIds.includes(item.orden_id)),
+      evidencias: evidencias.filter(
+        (item) =>
+          item.publico !== false &&
+          (item.moto_id === moto.id ||
+            Boolean(item.movimiento_id && movimientos.some((movimiento) => movimiento.id === item.movimiento_id && movimiento.moto_id === moto.id && movimiento.publico)) ||
+            Boolean(item.orden_id && ordenIds.includes(item.orden_id))),
+      ),
     };
   }, [clientes, codigo, evidencias, motocicletas, movimientos, ordenes]);
 

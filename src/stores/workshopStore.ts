@@ -45,9 +45,9 @@ type Store = WorkshopState & {
     costo?: number;
     kilometraje?: number;
     estado_nuevo?: EstadoOrden;
-  }) => Promise<void>;
+  }) => Promise<MovimientoOrden | undefined>;
   deleteMovimiento: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
-  addEvidence: (data: { orden_id: string; tipo: TipoEvidencia; nota?: string; file: File }) => Promise<void>;
+  addEvidence: (data: { orden_id?: string; moto_id?: string; movimiento_id?: string; tipo: TipoEvidencia; nota?: string; publico?: boolean; file: File }) => Promise<void>;
   getCliente: (id: string) => Cliente | undefined;
   getMoto: (id: string) => Motocicleta | undefined;
   getOrden: (id: string) => OrdenTrabajo | undefined;
@@ -417,11 +417,12 @@ export const useWorkshopStore = create<Store>()(
             kilometraje: data.kilometraje || null,
           });
           if (movimiento) set((state) => ({ movimientos: [movimiento, ...state.movimientos], tallerId: taller_id }));
-          return;
+          return movimiento ?? undefined;
         }
 
         const movimiento = withBase("mov", data);
         set((state) => ({ movimientos: [movimiento, ...state.movimientos] }));
+        return movimiento;
       },
 
       deleteMovimiento: async (id) => {
@@ -436,22 +437,32 @@ export const useWorkshopStore = create<Store>()(
         return { ok: true };
       },
 
-      addEvidence: async ({ orden_id, tipo, nota, file }) => {
+      addEvidence: async ({ orden_id, moto_id, movimiento_id, tipo, nota, publico = true, file }) => {
         let url = URL.createObjectURL(file);
         let taller_id = get().tallerId ?? localTallerId;
 
         if (supabase) {
           taller_id = await requireTallerId(get().tallerId);
-          const path = `${orden_id}/${Date.now()}-${file.name}`;
+          const owner = movimiento_id ?? moto_id ?? orden_id ?? "sin-vinculo";
+          const path = `${owner}/${Date.now()}-${file.name}`;
           const { error } = await supabase.storage.from(storageBucket).upload(path, file, { upsert: true });
           if (error) throw error;
           url = supabase.storage.from(storageBucket).getPublicUrl(path).data.publicUrl;
-          const evidence = await insertRow<Evidencia>("evidencias", { taller_id, orden_id, tipo, nota: nota || null, url });
+          const evidence = await insertRow<Evidencia>("evidencias", {
+            taller_id,
+            orden_id: orden_id || null,
+            moto_id: moto_id || null,
+            movimiento_id: movimiento_id || null,
+            tipo,
+            nota: nota || null,
+            publico,
+            url,
+          });
           if (evidence) set((state) => ({ evidencias: [evidence, ...state.evidencias], tallerId: taller_id }));
           return;
         }
 
-        const evidence: Evidencia = withBase("evidencia", { orden_id, tipo, nota, url }, taller_id);
+        const evidence: Evidencia = withBase("evidencia", { orden_id, moto_id, movimiento_id, tipo, nota, publico, url }, taller_id);
         set((state) => ({ evidencias: [...state.evidencias, evidence] }));
       },
 

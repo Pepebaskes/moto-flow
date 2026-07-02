@@ -82,16 +82,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       const active = Boolean(data.session);
       setHasSession(active);
-      void loadFromSupabase();
+      if (active) {
+        void loadFromSupabase();
+      } else {
+        logout();
+      }
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session));
-      if (session) void loadFromSupabase();
+      if (session) {
+        void loadFromSupabase();
+      } else {
+        logout();
+      }
     });
 
     return () => data.subscription.unsubscribe();
-  }, [loadFromSupabase, user]);
+  }, [loadFromSupabase, logout, user]);
 
   if (!user) return <AuthPage />;
 

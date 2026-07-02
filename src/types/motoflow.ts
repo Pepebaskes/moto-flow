@@ -59,10 +59,13 @@ export type OrdenTrabajo = BaseEntity & {
 };
 
 export type Evidencia = BaseEntity & {
-  orden_id: string;
+  orden_id?: string;
+  moto_id?: string;
+  movimiento_id?: string;
   url: string;
   tipo: TipoEvidencia;
   nota?: string;
+  publico?: boolean;
 };
 
 export type MovimientoOrden = BaseEntity & {

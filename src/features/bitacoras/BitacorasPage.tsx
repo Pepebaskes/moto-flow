@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, FileClock, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, FileClock, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/Button";
@@ -43,6 +43,7 @@ export function BitacorasPage() {
   const [tab, setTab] = useState<Tab>("avance");
   const [saving, setSaving] = useState(false);
   const [savingDate, setSavingDate] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const bitacoras = useMemo(() => {
     return store.motocicletas
@@ -63,6 +64,22 @@ export function BitacorasPage() {
   const moto = seleccionada?.moto;
   const cliente = seleccionada?.cliente;
   const historial = seleccionada?.historial ?? [];
+  const evidenciasMoto = useMemo(() => {
+    if (!moto) return [];
+    const ordenIds = store.ordenes.filter((orden) => orden.moto_id === moto.id).map((orden) => orden.id);
+    const movimientoIds = historial.map((movimiento) => movimiento.id);
+    return store.evidencias.filter(
+      (evidencia) =>
+        evidencia.moto_id === moto.id ||
+        Boolean(evidencia.movimiento_id && movimientoIds.includes(evidencia.movimiento_id)) ||
+        Boolean(evidencia.orden_id && ordenIds.includes(evidencia.orden_id)),
+    );
+  }, [historial, moto, store.evidencias, store.ordenes]);
+
+  function showNotice(message: string) {
+    setNotice(message);
+    window.setTimeout(() => setNotice(""), 2800);
+  }
 
   function openMoto(id: string) {
     setMotoId(id);
@@ -86,20 +103,49 @@ export function BitacorasPage() {
     event.preventDefault();
     if (!moto) return;
 
+    const formElement = event.currentTarget;
     const form = new FormData(event.currentTarget);
+    const tipo = form.get("tipo") as MovimientoOrden["tipo"];
+    const publico = form.get("publico") === "on";
+    const fotos = form
+      .getAll("fotos")
+      .filter((file): file is File => file instanceof File && file.size > 0);
+
     setSaving(true);
-    await store.addMovimiento({
-      moto_id: moto.id,
-      tipo: form.get("tipo") as MovimientoOrden["tipo"],
-      titulo: String(form.get("titulo") || "Actualizacion de taller"),
-      nota: String(form.get("nota") || ""),
-      publico: form.get("publico") === "on",
-      costo: Number(form.get("costo") || 0),
-      kilometraje: Number(form.get("kilometraje") || moto.kilometraje || 0),
-    });
-    setSaving(false);
-    event.currentTarget.reset();
-    setTab("historial");
+    try {
+      const movimiento = await store.addMovimiento({
+        moto_id: moto.id,
+        tipo,
+        titulo: String(form.get("titulo") || "Actualizacion de taller"),
+        nota: String(form.get("nota") || ""),
+        publico,
+        costo: Number(form.get("costo") || 0),
+        kilometraje: Number(form.get("kilometraje") || moto.kilometraje || 0),
+      });
+
+      if (movimiento && fotos.length > 0) {
+        await Promise.all(
+          fotos.map((file) =>
+            store.addEvidence({
+              moto_id: moto.id,
+              movimiento_id: movimiento.id,
+              tipo: tipo === "salida" ? "salida" : tipo === "entrada" ? "entrada" : "proceso",
+              nota: String(form.get("titulo") || "Foto de bitacora"),
+              publico,
+              file,
+            }),
+          ),
+        );
+      }
+
+      formElement.reset();
+      showNotice(fotos.length > 0 ? `Bitacora agregada correctamente con ${fotos.length} foto(s).` : "Bitacora agregada correctamente.");
+      setTab("historial");
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "No se pudo guardar la bitacora.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveFechaEstimada(event: FormEvent<HTMLFormElement>) {
@@ -173,6 +219,13 @@ export function BitacorasPage() {
 
   return (
     <div className="space-y-5">
+      {notice ? (
+        <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-[#F2B705]/30 bg-[#151515] px-4 py-3 text-sm font-semibold text-[#FFF2E1] shadow-2xl shadow-black/45 sm:left-auto sm:right-6">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-[#F2B705]" />
+          <span className="min-w-0 break-words">{notice}</span>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
@@ -274,6 +327,13 @@ export function BitacorasPage() {
               <Input name="costo" type="number" min="0" step="0.01" defaultValue="0" />
             </Field>
 
+            <Field label="Fotos opcionales">
+              <Input name="fotos" type="file" accept="image/*" multiple />
+            </Field>
+            <p className="-mt-2 text-xs text-[#FFF2E1]/58">
+              Si la entrada esta marcada como visible, estas fotos tambien apareceran en la consulta del cliente.
+            </p>
+
             <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-white/10 bg-[#151515] px-3 text-sm font-semibold text-[#FFF2E1]">
               <input name="publico" type="checkbox" className="h-4 w-4 accent-[#F2B705]" defaultChecked />
               Visible para el cliente
@@ -326,6 +386,19 @@ export function BitacorasPage() {
                 </div>
 
                 {movimiento.nota ? <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#FFF2E1]/82">{movimiento.nota}</p> : null}
+
+                {evidenciasMoto.filter((evidencia) => evidencia.movimiento_id === movimiento.id).length ? (
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {evidenciasMoto
+                      .filter((evidencia) => evidencia.movimiento_id === movimiento.id)
+                      .map((evidencia) => (
+                        <a key={evidencia.id} href={evidencia.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-2xl border border-white/10 bg-[#0B0B0B]">
+                          <img src={evidencia.url} alt={evidencia.nota || evidencia.tipo} className="h-28 w-full object-cover" />
+                          <p className="truncate px-2 py-1.5 text-xs font-semibold text-[#FFF2E1]/75">{evidencia.publico ? "Visible" : "Interna"}</p>
+                        </a>
+                      ))}
+                  </div>
+                ) : null}
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {movimiento.costo ? <span className="rounded-full bg-[#F2B705] px-3 py-1 text-xs font-semibold text-[#0B0B0B]">{currency(movimiento.costo)}</span> : null}
