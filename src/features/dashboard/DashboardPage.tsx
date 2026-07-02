@@ -25,6 +25,7 @@ export function DashboardPage() {
     .map((moto) => {
       const historial = movimientos
         .filter((movimiento) => movimiento.moto_id === moto.id)
+        .filter((movimiento) => !moto.ciclo_trabajo_id || !movimiento.ciclo_trabajo_id || movimiento.ciclo_trabajo_id === moto.ciclo_trabajo_id)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       return { moto, cliente: getCliente(moto.cliente_id), historial, ultimo: historial[0] };
     })

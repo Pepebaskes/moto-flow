@@ -60,6 +60,7 @@ export function BitacorasPage() {
         const ordenIds = store.ordenes.filter((orden) => orden.moto_id === moto.id).map((orden) => orden.id);
         const historial = store.movimientos
           .filter((movimiento) => movimiento.moto_id === moto.id || Boolean(movimiento.orden_id && ordenIds.includes(movimiento.orden_id)))
+          .filter((movimiento) => !moto.ciclo_trabajo_id || !movimiento.ciclo_trabajo_id || movimiento.ciclo_trabajo_id === moto.ciclo_trabajo_id)
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         const ultima = historial[0];
         const total = historial.reduce((sum, movimiento) => sum + (Number(movimiento.costo) || 0), 0);
@@ -220,7 +221,7 @@ export function BitacorasPage() {
       <div className="space-y-5">
         <PageHeader
           title="Trabajos activos"
-          subtitle="Primero elige una moto. Aqui se agrega diagnostico, prioridad, avances, fotos, costos y salida."
+          subtitle="Solo aparecen motos activas. Aqui se agrega diagnostico, prioridad, avances, fotos, costos y salida."
           actions={
             <>
               <Link to="/historial"><Button variant="secondary">Ver historial</Button></Link>

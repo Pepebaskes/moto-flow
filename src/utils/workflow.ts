@@ -40,7 +40,7 @@ export const estadosOperativos = Object.keys(estadoOperativoLabels) as EstadoOpe
 export const tamanosTrabajo = Object.keys(tamanoTrabajoLabels) as TamanoTrabajo[];
 
 export function isTrabajoActivo(moto: Motocicleta, historial: MovimientoOrden[]) {
-  return moto.estado_operativo !== "entregada" && !historial.some((movimiento) => movimiento.tipo === "salida");
+  return moto.activa !== false && moto.estado_operativo !== "entregada" && !historial.some((movimiento) => movimiento.tipo === "salida");
 }
 
 export function priorityTone(value: PrioridadTrabajo = "media") {

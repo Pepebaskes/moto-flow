@@ -1,11 +1,11 @@
-import { Trash2 } from "lucide-react";
+import { Power, PowerOff, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
 import { MotoForm, type MotoFormData } from "@/features/motocicletas/MotoForm";
 import { useWorkshopStore } from "@/stores/workshopStore";
-import { shortDate } from "@/utils/format";
+import { estadoOperativoLabels } from "@/utils/workflow";
 
 function DetailItem({ label, value }: { label: string; value?: string | number }) {
   return (
@@ -30,7 +30,7 @@ export function MotoCreatePage() {
 
 export function MotoDetailPage() {
   const { id = "" } = useParams();
-  const { getMoto, getCliente, updateMoto, deleteMoto, ordenes, movimientos } = useWorkshopStore();
+  const { getMoto, getCliente, updateMoto, deleteMoto, activateMoto, deactivateMoto, ordenes, movimientos } = useWorkshopStore();
   const moto = getMoto(id);
   const navigate = useNavigate();
 
@@ -52,6 +52,18 @@ export function MotoDetailPage() {
     navigate("/motocicletas");
   }
 
+  async function toggleActive() {
+    if (!moto) return;
+    if (moto.activa !== false) {
+      if (!window.confirm("Marcar esta moto como inactiva? Se quitara de Trabajos activos.")) return;
+      await deactivateMoto(moto.id);
+      return;
+    }
+
+    if (!window.confirm("Activar esta moto y abrir un nuevo trabajo limpio?")) return;
+    await activateMoto(moto.id);
+  }
+
   return (
     <div className="min-w-0">
       <PageHeader
@@ -60,6 +72,10 @@ export function MotoDetailPage() {
         actions={
           <>
             <Link to="/bitacoras"><Button variant="secondary">Abrir trabajo</Button></Link>
+            <Button type="button" variant={moto.activa !== false ? "secondary" : "primary"} onClick={() => void toggleActive()}>
+              {moto.activa !== false ? <PowerOff className="h-4 w-4 shrink-0" /> : <Power className="h-4 w-4 shrink-0" />}
+              {moto.activa !== false ? "Inactivar" : "Activar"}
+            </Button>
             <Button type="button" variant="danger" onClick={() => void removeMoto()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button>
           </>
         }
@@ -76,7 +92,8 @@ export function MotoDetailPage() {
               <DetailItem label="Placas" value={moto.placas} />
               <DetailItem label="Color" value={moto.color} />
               <DetailItem label="Kilometraje" value={`${moto.kilometraje.toLocaleString()} km`} />
-              <DetailItem label="Salida estimada" value={moto.fecha_estimada_salida ? shortDate(moto.fecha_estimada_salida) : "Por definir"} />
+              <DetailItem label="Estado expediente" value={moto.activa !== false ? "Activa en taller" : "Inactiva"} />
+              <DetailItem label="Estado de trabajo" value={moto.activa !== false ? estadoOperativoLabels[moto.estado_operativo ?? "recibida"] : "Sin trabajo activo"} />
               <DetailItem label="Numero de serie" value={moto.numero_serie} />
               <DetailItem label="Cliente" value={cliente?.nombre} />
             </div>

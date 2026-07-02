@@ -27,6 +27,8 @@ type Store = WorkshopState & {
   deleteCliente: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addMoto: (data: NewMoto) => Promise<void>;
   updateMoto: (id: string, data: NewMoto) => Promise<void>;
+  activateMoto: (id: string) => Promise<void>;
+  deactivateMoto: (id: string) => Promise<void>;
   updateMotoFechaEstimada: (id: string, fecha_estimada_salida: string) => Promise<void>;
   updateMotoTrabajo: (id: string, data: { prioridad_trabajo?: PrioridadTrabajo; tipo_trabajo?: TipoTrabajo; estado_operativo?: EstadoOperativo; tamano_trabajo?: TamanoTrabajo }) => Promise<void>;
   deleteMoto: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -46,6 +48,7 @@ type Store = WorkshopState & {
     costo?: number;
     kilometraje?: number;
     estado_nuevo?: EstadoOrden;
+    ciclo_trabajo_id?: string;
   }) => Promise<MovimientoOrden | undefined>;
   deleteMovimiento: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addEvidence: (data: { orden_id?: string; moto_id?: string; movimiento_id?: string; tipo: TipoEvidencia; nota?: string; publico?: boolean; file: File }) => Promise<void>;
@@ -71,14 +74,13 @@ function withBase<T extends object>(prefix: string, data: T, taller_id = localTa
   };
 }
 
-function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "placas" | "color" | "kilometraje" | "fecha_estimada_salida" | "numero_serie">) {
+function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "placas" | "color" | "kilometraje" | "numero_serie">) {
   return [
     `Moto recibida dentro del taller.`,
     `Unidad: ${moto.marca} ${moto.modelo} ${moto.anio}.`,
     `Placas: ${moto.placas}.`,
     `Color: ${moto.color}.`,
     `Kilometraje: ${moto.kilometraje.toLocaleString()} km.`,
-    moto.fecha_estimada_salida ? `Fecha estimada de salida: ${moto.fecha_estimada_salida}.` : "",
     moto.numero_serie ? `Serie: ${moto.numero_serie}.` : "",
   ]
     .filter(Boolean)
@@ -88,6 +90,8 @@ function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "
 function withTrabajoDefaults<T extends Partial<Motocicleta>>(data: T) {
   return {
     ...data,
+    activa: data.activa ?? true,
+    ciclo_trabajo_id: data.ciclo_trabajo_id ?? uid("trabajo"),
     prioridad_trabajo: data.prioridad_trabajo ?? "media",
     tipo_trabajo: data.tipo_trabajo ?? "diagnostico",
     estado_operativo: data.estado_operativo ?? "recibida",
@@ -213,13 +217,16 @@ export const useWorkshopStore = create<Store>()(
       },
 
       addMoto: async (data) => {
+        const trabajoId = uid("trabajo");
+        const baseMoto = withTrabajoDefaults({ ...data, activa: true, ciclo_trabajo_id: trabajoId });
         if (supabase) {
           const taller_id = await requireTallerId(get().tallerId);
-          const moto = await insertRow<Motocicleta>("motocicletas", { ...motoPayload(data), taller_id });
+          const moto = await insertRow<Motocicleta>("motocicletas", { ...motoPayload(baseMoto), taller_id });
           if (moto) {
             const movimiento = await insertRow<MovimientoOrden>("movimientos_orden", {
               taller_id,
               moto_id: moto.id,
+              ciclo_trabajo_id: moto.ciclo_trabajo_id,
               tipo: "entrada",
               titulo: "Recibida dentro del taller",
               nota: motoEntradaText(moto),
@@ -234,9 +241,10 @@ export const useWorkshopStore = create<Store>()(
           }
           return;
         }
-        const moto = withBase("moto", withTrabajoDefaults(data));
+        const moto = withBase("moto", baseMoto);
         const movimiento = withBase("mov", {
           moto_id: moto.id,
+          ciclo_trabajo_id: moto.ciclo_trabajo_id,
           tipo: "entrada" as const,
           titulo: "Recibida dentro del taller",
           nota: motoEntradaText(moto),
@@ -253,7 +261,67 @@ export const useWorkshopStore = create<Store>()(
           if (moto) set((state) => ({ motocicletas: state.motocicletas.map((item) => (item.id === id ? moto : item)) }));
           return;
         }
-        set((state) => ({ motocicletas: state.motocicletas.map((moto) => (moto.id === id ? { ...moto, ...withTrabajoDefaults(data), updated_at: stamp() } : moto)) }));
+        set((state) => ({ motocicletas: state.motocicletas.map((moto) => (moto.id === id ? { ...moto, ...withTrabajoDefaults({ ...moto, ...data }), updated_at: stamp() } : moto)) }));
+      },
+
+      activateMoto: async (id) => {
+        const current = get().motocicletas.find((moto) => moto.id === id);
+        if (!current || current.activa) return;
+        const ciclo_trabajo_id = uid("trabajo");
+        const payload = {
+          activa: true,
+          ciclo_trabajo_id,
+          estado_operativo: "recibida" as EstadoOperativo,
+          prioridad_trabajo: "media" as PrioridadTrabajo,
+          tipo_trabajo: "diagnostico" as TipoTrabajo,
+          tamano_trabajo: "medio" as TamanoTrabajo,
+          fecha_estimada_salida: null,
+        };
+
+        let updated: Motocicleta | null = null;
+        if (supabase) {
+          updated = await updateRow<Motocicleta>("motocicletas", id, payload);
+        }
+
+        const moto = updated ?? { ...current, ...payload, fecha_estimada_salida: undefined, updated_at: stamp() };
+        set((state) => ({ motocicletas: state.motocicletas.map((item) => (item.id === id ? moto : item)) }));
+
+        await get().addMovimiento({
+          moto_id: id,
+          ciclo_trabajo_id,
+          tipo: "entrada",
+          titulo: "Recibida dentro del taller",
+          nota: motoEntradaText(moto),
+          publico: true,
+          kilometraje: moto.kilometraje,
+        });
+      },
+
+      deactivateMoto: async (id) => {
+        const current = get().motocicletas.find((moto) => moto.id === id);
+        if (!current || current.activa === false) return;
+        const payload = {
+          activa: false,
+          estado_operativo: "entregada" as EstadoOperativo,
+        };
+
+        let updated: Motocicleta | null = null;
+        if (supabase) {
+          updated = await updateRow<Motocicleta>("motocicletas", id, payload);
+        }
+
+        const moto = updated ?? { ...current, ...payload, updated_at: stamp() };
+        set((state) => ({ motocicletas: state.motocicletas.map((item) => (item.id === id ? moto : item)) }));
+
+        await get().addMovimiento({
+          moto_id: id,
+          ciclo_trabajo_id: current.ciclo_trabajo_id,
+          tipo: "estado",
+          titulo: "Trabajo archivado",
+          nota: "La moto se marco como inactiva en el expediente. Se conserva su historial para futuras visitas.",
+          publico: false,
+          kilometraje: current.kilometraje,
+        });
       },
 
       updateMotoTrabajo: async (id, data) => {
@@ -443,19 +511,25 @@ export const useWorkshopStore = create<Store>()(
       },
 
       addMovimiento: async (data) => {
+        const moto = data.moto_id ? get().motocicletas.find((item) => item.id === data.moto_id) : undefined;
+        const payload = {
+          ...data,
+          ciclo_trabajo_id: data.ciclo_trabajo_id || moto?.ciclo_trabajo_id || null,
+          costo: data.costo || null,
+          kilometraje: data.kilometraje || null,
+        };
+
         if (supabase) {
           const taller_id = await requireTallerId(get().tallerId);
           const movimiento = await insertRow<MovimientoOrden>("movimientos_orden", {
             taller_id,
-            ...data,
-            costo: data.costo || null,
-            kilometraje: data.kilometraje || null,
+            ...payload,
           });
           if (movimiento) set((state) => ({ movimientos: [movimiento, ...state.movimientos], tallerId: taller_id }));
           return movimiento ?? undefined;
         }
 
-        const movimiento = withBase("mov", data);
+        const movimiento = withBase("mov", payload);
         set((state) => ({ movimientos: [movimiento, ...state.movimientos] }));
         return movimiento;
       },

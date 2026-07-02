@@ -14,7 +14,6 @@ const schema = z.object({
   placas: z.string({ required_error: "Escribe las placas." }).trim().min(1, "Escribe las placas."),
   color: z.string({ required_error: "Escribe el color." }).trim().min(2, "Escribe el color."),
   kilometraje: z.coerce.number({ required_error: "Escribe el kilometraje." }).min(0),
-  fecha_estimada_salida: z.string().optional(),
   numero_serie: z.string().optional(),
   notas: z.string().optional(),
 });
@@ -33,7 +32,6 @@ export function MotoForm({ initial, onSubmit }: { initial?: Motocicleta; onSubmi
       placas: "",
       color: "",
       kilometraje: 0,
-      fecha_estimada_salida: "",
       numero_serie: "",
       notas: "",
     },
@@ -52,9 +50,6 @@ export function MotoForm({ initial, onSubmit }: { initial?: Motocicleta; onSubmi
         <Field label="Color" error={errors.color?.message}><Input {...register("color")} /></Field>
         <Field label="Kilometraje" error={errors.kilometraje?.message}><Input type="number" {...register("kilometraje")} /></Field>
       </div>
-      <Field label="Fecha estimada inicial de salida">
-        <Input type="date" {...register("fecha_estimada_salida")} />
-      </Field>
       <Field label="Numero de serie opcional"><Input {...register("numero_serie")} /></Field>
       <Field label="Notas de registro"><Textarea placeholder="Detalles de identificacion, condiciones generales o comentarios administrativos. El diagnostico va en Trabajos activos." {...register("notas")} /></Field>
       <Button type="submit">Guardar motocicleta</Button>

@@ -55,6 +55,8 @@ create table if not exists public.motocicletas (
   color text not null,
   kilometraje int not null default 0,
   fecha_estimada_salida date,
+  activa boolean not null default true,
+  ciclo_trabajo_id text,
   prioridad_trabajo text not null default 'media',
   tipo_trabajo text not null default 'diagnostico',
   estado_operativo text not null default 'recibida',
@@ -122,6 +124,7 @@ create table if not exists public.movimientos_orden (
   moto_id uuid references public.motocicletas(id) on delete cascade,
   estado_anterior public.estado_orden,
   estado_nuevo public.estado_orden,
+  ciclo_trabajo_id text,
   tipo text not null default 'avance',
   titulo text not null default 'Actualizacion',
   nota text,
@@ -155,14 +158,24 @@ alter table public.movimientos_orden alter column orden_id drop not null;
 alter table public.movimientos_orden add column if not exists moto_id uuid references public.motocicletas(id) on delete cascade;
 alter table public.movimientos_orden add column if not exists titulo text not null default 'Actualizacion';
 alter table public.movimientos_orden alter column estado_nuevo drop not null;
+alter table public.movimientos_orden add column if not exists ciclo_trabajo_id text;
 alter table public.movimientos_orden add column if not exists publico boolean not null default false;
 alter table public.movimientos_orden add column if not exists costo numeric(12,2);
 alter table public.movimientos_orden add column if not exists kilometraje int;
 alter table public.motocicletas add column if not exists fecha_estimada_salida date;
+alter table public.motocicletas add column if not exists activa boolean not null default true;
+alter table public.motocicletas add column if not exists ciclo_trabajo_id text;
 alter table public.motocicletas add column if not exists prioridad_trabajo text not null default 'media';
 alter table public.motocicletas add column if not exists tipo_trabajo text not null default 'diagnostico';
 alter table public.motocicletas add column if not exists estado_operativo text not null default 'recibida';
 alter table public.motocicletas add column if not exists tamano_trabajo text not null default 'medio';
+update public.motocicletas
+set ciclo_trabajo_id = coalesce(ciclo_trabajo_id, id::text),
+    activa = coalesce(activa, true);
+update public.movimientos_orden mo
+set ciclo_trabajo_id = coalesce(mo.ciclo_trabajo_id, m.ciclo_trabajo_id)
+from public.motocicletas m
+where mo.moto_id = m.id;
 alter table public.evidencias alter column orden_id drop not null;
 alter table public.evidencias add column if not exists moto_id uuid references public.motocicletas(id) on delete cascade;
 alter table public.evidencias add column if not exists movimiento_id uuid references public.movimientos_orden(id) on delete cascade;

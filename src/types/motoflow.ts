@@ -41,6 +41,8 @@ export type Motocicleta = BaseEntity & {
   color: string;
   kilometraje: number;
   fecha_estimada_salida?: string;
+  activa?: boolean;
+  ciclo_trabajo_id?: string;
   prioridad_trabajo?: PrioridadTrabajo;
   tipo_trabajo?: TipoTrabajo;
   estado_operativo?: EstadoOperativo;
@@ -81,6 +83,7 @@ export type MovimientoOrden = BaseEntity & {
   moto_id?: string;
   estado_anterior?: EstadoOrden;
   estado_nuevo?: EstadoOrden;
+  ciclo_trabajo_id?: string;
   tipo: "entrada" | "proceso" | "salida" | "estado" | "avance" | "cotizacion" | "nota";
   titulo: string;
   nota?: string;
