@@ -82,32 +82,32 @@ export function OrdenDetailPage() {
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-4">
         <Card><p className="text-sm text-neutral-500">Estado</p><div className="mt-2"><StatusBadge value={orden.estado} /></div></Card>
         <Card><p className="text-sm text-neutral-500">Prioridad</p><div className="mt-2"><PriorityBadge value={orden.prioridad} /></div></Card>
-        <Card><p className="text-sm text-neutral-500">Cotizacion base</p><p className="mt-2 text-xl font-bold">{currency(orden.total_estimado)}</p></Card>
-        <Card><p className="text-sm text-neutral-500">Hasta el momento</p><p className="mt-2 text-xl font-bold">{currency(cotizacionActual)}</p></Card>
+        <Card><p className="text-sm text-neutral-500">Cotizacion base</p><p className="mt-2 text-xl font-semibold">{currency(orden.total_estimado)}</p></Card>
+        <Card><p className="text-sm text-neutral-500">Hasta el momento</p><p className="mt-2 text-xl font-semibold">{currency(cotizacionActual)}</p></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-5">
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Datos de la orden</h2>
+            <h2 className="mb-3 text-lg font-semibold">Datos de la orden</h2>
             <OrdenForm initial={orden} onSubmit={async (data: OrdenFormData) => { await store.updateOrden(orden.id, data); navigate("/ordenes"); }} />
           </Card>
 
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Historial y bitacora</h2>
+            <h2 className="mb-3 text-lg font-semibold">Historial y bitacora</h2>
             <div className="space-y-3">
               {movimientos.length === 0 ? <p className="text-sm text-neutral-500">Aun no hay movimientos para esta moto.</p> : null}
               {movimientos.map((movimiento) => (
                 <div key={movimiento.id} className="rounded-lg border border-neutral-200 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <p className="font-bold">{movimiento.titulo}</p>
+                      <p className="font-semibold">{movimiento.titulo}</p>
                       <p className="text-xs font-semibold uppercase text-neutral-500">
                         {new Date(movimiento.created_at).toLocaleString("es-MX")} · {movimiento.tipo}
                         {movimiento.publico ? " · visible para cliente" : " · interno"}
                       </p>
                     </div>
-                    {movimiento.costo ? <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold">{currency(movimiento.costo)}</span> : null}
+                    {movimiento.costo ? <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold">{currency(movimiento.costo)}</span> : null}
                   </div>
                   {movimiento.nota ? <p className="mt-2 text-sm text-neutral-700">{movimiento.nota}</p> : null}
                   {movimiento.kilometraje ? <p className="mt-2 text-xs font-semibold text-neutral-500">{movimiento.kilometraje.toLocaleString()} km</p> : null}
@@ -118,7 +118,7 @@ export function OrdenDetailPage() {
         </div>
         <div className="space-y-5">
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Cambiar estado</h2>
+            <h2 className="mb-3 text-lg font-semibold">Cambiar estado</h2>
             <Select value={orden.estado} onChange={(event) => void store.changeOrderStatus(orden.id, event.target.value as typeof orden.estado)}>
               {estadosOrden.map((estado) => <option key={estado} value={estado}>{estadoLabels[estado]}</option>)}
             </Select>
@@ -127,7 +127,7 @@ export function OrdenDetailPage() {
           </Card>
 
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Bitacora del dia</h2>
+            <h2 className="mb-3 text-lg font-semibold">Bitacora del dia</h2>
             <form className="grid gap-3" onSubmit={addTimelineEntry}>
               <Field label="Tipo">
                 <Select name="tipo" defaultValue="proceso">
@@ -153,7 +153,7 @@ export function OrdenDetailPage() {
           </Card>
 
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Evidencias</h2>
+            <h2 className="mb-3 text-lg font-semibold">Evidencias</h2>
             <form className="grid gap-3" onSubmit={uploadEvidence}>
               <Field label="Tipo"><Select name="tipo" defaultValue="entrada"><option value="entrada">Entrada</option><option value="proceso">Proceso</option><option value="salida">Salida</option></Select></Field>
               <Field label="Foto"><Input name="file" type="file" accept="image/*" /></Field>

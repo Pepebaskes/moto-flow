@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
@@ -29,7 +30,7 @@ export function MotoCreatePage() {
 
 export function MotoDetailPage() {
   const { id = "" } = useParams();
-  const { getMoto, getCliente, updateMoto, ordenes, movimientos } = useWorkshopStore();
+  const { getMoto, getCliente, updateMoto, deleteMoto, ordenes, movimientos } = useWorkshopStore();
   const moto = getMoto(id);
   const navigate = useNavigate();
 
@@ -41,18 +42,33 @@ export function MotoDetailPage() {
     .filter((movimiento) => movimiento.moto_id === moto.id || ordenesMoto.some((orden) => orden.id === movimiento.orden_id))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+  async function removeMoto() {
+    if (!moto || !window.confirm(`¿Eliminar moto ${moto.marca} ${moto.modelo}?`)) return;
+    const result = await deleteMoto(moto.id);
+    if (!result.ok) {
+      window.alert(result.message);
+      return;
+    }
+    navigate("/motocicletas");
+  }
+
   return (
     <div>
       <PageHeader
         title={`${moto.marca} ${moto.modelo}`}
         subtitle={`Placas ${moto.placas} · ${cliente?.nombre ?? "Sin cliente"}`}
-        actions={<Link to="/bitacoras"><Button variant="secondary">Abrir bitacora</Button></Link>}
+        actions={
+          <>
+            <Link to="/bitacoras"><Button variant="secondary">Abrir bitacora</Button></Link>
+            <Button type="button" variant="danger" onClick={() => void removeMoto()}><Trash2 className="h-4 w-4" /> Eliminar</Button>
+          </>
+        }
       />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,520px)_1fr]">
         <div className="space-y-5">
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Ficha de la motocicleta</h2>
+            <h2 className="mb-3 text-lg font-semibold">Ficha de la motocicleta</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <DetailItem label="Marca" value={moto.marca} />
               <DetailItem label="Modelo" value={moto.modelo} />
@@ -73,13 +89,13 @@ export function MotoDetailPage() {
           </Card>
 
           <Card>
-            <h2 className="mb-3 text-lg font-bold">Editar datos</h2>
+            <h2 className="mb-3 text-lg font-semibold">Editar datos</h2>
             <MotoForm initial={moto} onSubmit={async (data: MotoFormData) => { await updateMoto(moto.id, data); navigate("/motocicletas"); }} />
           </Card>
         </div>
 
         <Card>
-          <h2 className="mb-3 text-lg font-bold">Historial de la moto</h2>
+          <h2 className="mb-3 text-lg font-semibold">Historial de la moto</h2>
           <div className="space-y-2">
             {historialMoto.length === 0 ? <p className="text-sm text-neutral-500">Aun no hay bitacora registrada.</p> : null}
             {historialMoto.map((movimiento) => (

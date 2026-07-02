@@ -19,7 +19,7 @@ export function OrdenesPage() {
             <Card className="transition hover:border-neutral-300 hover:bg-neutral-50">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-lg font-bold">{orden.titulo}</p>
+                  <p className="text-lg font-semibold">{orden.titulo}</p>
                   <p className="text-sm text-neutral-500">
                     {getCliente(orden.cliente_id)?.nombre} · {getMoto(orden.moto_id)?.marca} {getMoto(orden.moto_id)?.modelo} · {shortDate(orden.fecha_estimada)}
                   </p>
@@ -27,7 +27,7 @@ export function OrdenesPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <PriorityBadge value={orden.prioridad} />
                   <StatusBadge value={orden.estado} />
-                  <span className="text-sm font-bold">{currency(orden.total_estimado)}</span>
+                  <span className="text-sm font-semibold">{currency(orden.total_estimado)}</span>
                 </div>
               </div>
             </Card>

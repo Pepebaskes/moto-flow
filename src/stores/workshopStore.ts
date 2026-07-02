@@ -24,11 +24,14 @@ type Store = WorkshopState & {
   loadFromSupabase: () => Promise<void>;
   addCliente: (data: NewCliente) => Promise<void>;
   updateCliente: (id: string, data: NewCliente) => Promise<void>;
+  deleteCliente: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addMoto: (data: NewMoto) => Promise<void>;
   updateMoto: (id: string, data: NewMoto) => Promise<void>;
   updateMotoFechaEstimada: (id: string, fecha_estimada_salida: string) => Promise<void>;
+  deleteMoto: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addOrden: (data: NewOrden) => Promise<void>;
   addCotizacion: (data: NewCotizacion) => Promise<void>;
+  deleteCotizacion: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   updateOrden: (id: string, data: NewOrden) => Promise<void>;
   updateFechaEstimada: (id: string, fecha_estimada: string) => Promise<void>;
   changeOrderStatus: (id: string, estado: EstadoOrden) => Promise<void>;
@@ -43,13 +46,14 @@ type Store = WorkshopState & {
     kilometraje?: number;
     estado_nuevo?: EstadoOrden;
   }) => Promise<void>;
+  deleteMovimiento: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addEvidence: (data: { orden_id: string; tipo: TipoEvidencia; nota?: string; file: File }) => Promise<void>;
   getCliente: (id: string) => Cliente | undefined;
   getMoto: (id: string) => Motocicleta | undefined;
   getOrden: (id: string) => OrdenTrabajo | undefined;
 };
 
-const localTallerId = "11111111-1111-4111-8111-111111111111";
+const localTallerId = "local-taller";
 
 function stamp() {
   return new Date().toISOString();
@@ -80,15 +84,24 @@ function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "
     .join("\n");
 }
 
-async function requireTallerId(current?: string) {
+async function requireTallerId(_current?: string) {
   if (!supabase) return localTallerId;
 
   const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session) return localTallerId;
+  if (!sessionData.session) {
+    throw new Error("Inicia sesion con un usuario de Supabase para guardar datos reales del taller.");
+  }
 
-  if (current) return current;
+  const { data: perfil, error: perfilError } = await supabase
+    .from("perfiles")
+    .select("taller_id")
+    .eq("user_id", sessionData.session.user.id)
+    .maybeSingle();
 
-  const { data, error } = await supabase.rpc("bootstrap_taller", { p_nombre: "MotoFlow Taller" });
+  if (perfilError) throw perfilError;
+  if (perfil?.taller_id) return perfil.taller_id as string;
+
+  const { data, error } = await supabase.rpc("bootstrap_taller", { p_nombre: "Taller de Motos Villa" });
   if (error) throw error;
   return data as string;
 }
@@ -112,6 +125,12 @@ async function updateRow<T>(table: string, id: string, payload: Record<string, u
   const { data, error } = await supabase.from(table).update(payload).eq("id", id).select("*").single();
   if (error) throw error;
   return data as T;
+}
+
+async function deleteRow(table: string, id: string) {
+  if (!supabase) return;
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) throw error;
 }
 
 export const useWorkshopStore = create<Store>()(
@@ -145,7 +164,7 @@ export const useWorkshopStore = create<Store>()(
       addCliente: async (data) => {
         if (supabase) {
           const taller_id = await requireTallerId(get().tallerId);
-          const cliente = await insertRow<Cliente>("clientes", { ...data, email: data.email || null, taller_id });
+          const cliente = await insertRow<Cliente>("clientes", { ...data, localidad: data.localidad || null, taller_id });
           if (cliente) set((state) => ({ clientes: [cliente, ...state.clientes], tallerId: taller_id }));
           return;
         }
@@ -154,11 +173,22 @@ export const useWorkshopStore = create<Store>()(
 
       updateCliente: async (id, data) => {
         if (supabase) {
-          const cliente = await updateRow<Cliente>("clientes", id, { ...data, email: data.email || null });
+          const cliente = await updateRow<Cliente>("clientes", id, { ...data, localidad: data.localidad || null });
           if (cliente) set((state) => ({ clientes: state.clientes.map((item) => (item.id === id ? cliente : item)) }));
           return;
         }
         set((state) => ({ clientes: state.clientes.map((cliente) => (cliente.id === id ? { ...cliente, ...data, updated_at: stamp() } : cliente)) }));
+      },
+
+      deleteCliente: async (id) => {
+        const motosCliente = get().motocicletas.filter((moto) => moto.cliente_id === id);
+        if (motosCliente.length > 0) {
+          return { ok: false, message: "No puedes eliminar un cliente con motocicletas registradas. Elimina o reasigna sus motos primero." };
+        }
+
+        if (supabase) await deleteRow("clientes", id);
+        set((state) => ({ clientes: state.clientes.filter((cliente) => cliente.id !== id) }));
+        return { ok: true };
       },
 
       addMoto: async (data) => {
@@ -228,6 +258,18 @@ export const useWorkshopStore = create<Store>()(
         });
       },
 
+      deleteMoto: async (id) => {
+        const movimientosMoto = get().movimientos.filter((movimiento) => movimiento.moto_id === id);
+        const cotizacionesMoto = get().cotizaciones.filter((cotizacion) => cotizacion.moto_id === id);
+        if (movimientosMoto.length > 0 || cotizacionesMoto.length > 0) {
+          return { ok: false, message: "No puedes eliminar una moto con bitacoras o cotizaciones. Borra primero esos registros si realmente quieres quitarla." };
+        }
+
+        if (supabase) await deleteRow("motocicletas", id);
+        set((state) => ({ motocicletas: state.motocicletas.filter((moto) => moto.id !== id) }));
+        return { ok: true };
+      },
+
       addOrden: async (data) => {
         const payload = { ...data, codigo_publico: data.codigo_publico || createPublicCode() };
         if (supabase) {
@@ -281,6 +323,12 @@ export const useWorkshopStore = create<Store>()(
 
         const cotizacion = withBase("cotizacion", payload);
         set((state) => ({ cotizaciones: [cotizacion, ...state.cotizaciones] }));
+      },
+
+      deleteCotizacion: async (id) => {
+        if (supabase) await deleteRow("cotizaciones", id);
+        set((state) => ({ cotizaciones: state.cotizaciones.filter((cotizacion) => cotizacion.id !== id) }));
+        return { ok: true };
       },
 
       updateOrden: async (id, data) => {
@@ -376,6 +424,18 @@ export const useWorkshopStore = create<Store>()(
         set((state) => ({ movimientos: [movimiento, ...state.movimientos] }));
       },
 
+      deleteMovimiento: async (id) => {
+        const movimiento = get().movimientos.find((item) => item.id === id);
+        if (!movimiento) return { ok: false, message: "No encontramos esa bitacora." };
+        if (movimiento.tipo === "entrada" && movimiento.titulo.toLowerCase().includes("recibida dentro del taller")) {
+          return { ok: false, message: "La primera bitacora automatica no se elimina. Es el registro de ingreso de la moto." };
+        }
+
+        if (supabase) await deleteRow("movimientos_orden", id);
+        set((state) => ({ movimientos: state.movimientos.filter((item) => item.id !== id) }));
+        return { ok: true };
+      },
+
       addEvidence: async ({ orden_id, tipo, nota, file }) => {
         let url = URL.createObjectURL(file);
         let taller_id = get().tallerId ?? localTallerId;
@@ -408,7 +468,6 @@ export const useWorkshopStore = create<Store>()(
         evidencias: state.evidencias,
         movimientos: state.movimientos,
         cotizaciones: state.cotizaciones,
-        tallerId: state.tallerId,
       }),
     },
   ),

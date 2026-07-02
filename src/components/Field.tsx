@@ -3,10 +3,10 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTML
 
 export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
-    <label className="block text-sm font-medium text-neutral-700">
+    <label className="block text-sm font-semibold text-[#FFF2E1]/75">
       <span>{label}</span>
       <div className="mt-1">{children}</div>
-      {error ? <span className="mt-1 block text-xs font-medium text-red-600">{error}</span> : null}
+      {error ? <span className="mt-1 block text-xs font-semibold text-red-300">{error}</span> : null}
     </label>
   );
 }
@@ -17,14 +17,14 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 ) {
   const fileStyles =
     props.type === "file"
-      ? "cursor-pointer py-2 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-950 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-neutral-800"
+      ? "cursor-pointer py-2 file:mr-3 file:rounded-xl file:border-0 file:bg-[#F2B705] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#0B0B0B] hover:file:bg-[#FFD08A]"
       : "";
 
   return (
     <input
       ref={ref}
       {...props}
-      className={`min-h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-200 ${fileStyles} ${className}`}
+      className={`min-h-11 w-full rounded-2xl border border-white/10 bg-[#0B0B0B]/55 px-3 text-sm text-white outline-none transition placeholder:text-[#FFF2E1]/45 hover:border-[#F2B705]/35 focus:border-[#F2B705] focus:bg-[#0B0B0B]/80 focus:ring-2 focus:ring-[#F2B705]/20 ${fileStyles} ${className}`}
     />
   );
 });
@@ -37,7 +37,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
     <textarea
       ref={ref}
       {...props}
-      className={`min-h-28 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-200 ${className}`}
+      className={`min-h-28 w-full rounded-2xl border border-white/10 bg-[#0B0B0B]/55 px-3 py-2 text-sm text-white outline-none transition placeholder:text-[#FFF2E1]/45 hover:border-[#F2B705]/35 focus:border-[#F2B705] focus:bg-[#0B0B0B]/80 focus:ring-2 focus:ring-[#F2B705]/20 ${className}`}
     />
   );
 });
@@ -50,7 +50,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
     <select
       ref={ref}
       {...props}
-      className={`min-h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none transition focus:border-neutral-900 focus:ring-2 focus:ring-neutral-200 ${className}`}
+      className={`min-h-11 w-full rounded-2xl border border-white/10 bg-[#0B0B0B]/55 px-3 text-sm text-white outline-none transition hover:border-[#F2B705]/35 focus:border-[#F2B705] focus:bg-[#0B0B0B]/80 focus:ring-2 focus:ring-[#F2B705]/20 ${className}`}
     />
   );
 });

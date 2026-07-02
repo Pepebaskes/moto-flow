@@ -21,10 +21,6 @@ create table if not exists public.talleres (
   updated_at timestamptz not null default now()
 );
 
-insert into public.talleres (id, nombre, telefono, email)
-values ('11111111-1111-4111-8111-111111111111', 'MotoFlow Taller Demo', null, null)
-on conflict (id) do nothing;
-
 create table if not exists public.perfiles (
   id uuid primary key default gen_random_uuid(),
   taller_id uuid not null references public.talleres(id) on delete cascade,
@@ -42,6 +38,7 @@ create table if not exists public.clientes (
   nombre text not null,
   telefono text not null,
   email text,
+  localidad text,
   notas text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -200,14 +197,6 @@ create policy "Evidencias por taller" on public.evidencias for all using (taller
 create policy "Movimientos por taller" on public.movimientos_orden for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
 create policy "Cotizaciones por taller" on public.cotizaciones for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
 create policy "Consulta publica de orden" on public.ordenes_trabajo for select using (codigo_publico is not null);
-create policy "Demo taller visible" on public.talleres for select using (id = '11111111-1111-4111-8111-111111111111');
-create policy "Demo clientes" on public.clientes for all using (taller_id = '11111111-1111-4111-8111-111111111111') with check (taller_id = '11111111-1111-4111-8111-111111111111');
-create policy "Demo motocicletas" on public.motocicletas for all using (taller_id = '11111111-1111-4111-8111-111111111111') with check (taller_id = '11111111-1111-4111-8111-111111111111');
-create policy "Demo ordenes" on public.ordenes_trabajo for all using (taller_id = '11111111-1111-4111-8111-111111111111') with check (taller_id = '11111111-1111-4111-8111-111111111111');
-create policy "Demo evidencias" on public.evidencias for all using (taller_id = '11111111-1111-4111-8111-111111111111') with check (taller_id = '11111111-1111-4111-8111-111111111111');
-create policy "Demo movimientos" on public.movimientos_orden for all using (taller_id = '11111111-1111-4111-8111-111111111111') with check (taller_id = '11111111-1111-4111-8111-111111111111');
-create policy "Demo cotizaciones" on public.cotizaciones for all using (taller_id = '11111111-1111-4111-8111-111111111111') with check (taller_id = '11111111-1111-4111-8111-111111111111');
-
 create or replace function public.consulta_cliente(p_busqueda text)
 returns jsonb
 language plpgsql
@@ -262,7 +251,7 @@ begin
 end;
 $$;
 
-create or replace function public.bootstrap_taller(p_nombre text default 'MotoFlow Taller')
+create or replace function public.bootstrap_taller(p_nombre text default 'Taller de Motos Villa')
 returns uuid
 language plpgsql
 security definer

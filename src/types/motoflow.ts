@@ -24,6 +24,7 @@ export type Cliente = BaseEntity & {
   nombre: string;
   telefono: string;
   email?: string;
+  localidad?: string;
   notas?: string;
 };
 

@@ -47,10 +47,10 @@ export function DashboardPage() {
             <Card key={metric.label}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm text-neutral-500">{metric.label}</p>
-                  <p className="mt-2 text-3xl font-bold">{metric.value}</p>
+                  <p className="text-sm text-[#FFF2E1]/60">{metric.label}</p>
+                  <p className="mt-2 text-3xl font-semibold">{metric.value}</p>
                 </div>
-                <div className="rounded-lg bg-neutral-100 p-3"><Icon className="h-5 w-5" /></div>
+                <div className="rounded-2xl bg-[#F2B705]/10 p-3 text-[#FFD08A]"><Icon className="h-5 w-5" /></div>
               </div>
             </Card>
           );
@@ -59,20 +59,20 @@ export function DashboardPage() {
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
         <Card>
-          <h2 className="mb-3 text-lg font-bold">Bitacoras recientes</h2>
+          <h2 className="mb-3 text-lg font-semibold">Bitacoras recientes</h2>
           <div className="space-y-3">
-            {movimientosRecientes.length === 0 ? <p className="text-sm text-neutral-500">Aun no hay movimientos registrados.</p> : null}
+            {movimientosRecientes.length === 0 ? <p className="text-sm text-[#FFF2E1]/60">Aun no hay movimientos registrados.</p> : null}
             {movimientosRecientes.map((movimiento) => {
               const moto = movimiento.moto_id ? getMoto(movimiento.moto_id) : undefined;
               const cliente = moto ? getCliente(moto.cliente_id) : undefined;
 
               return (
-                <Link key={movimiento.id} to="/bitacoras" className="block rounded-lg border border-neutral-200 p-3 transition hover:bg-neutral-50">
+                <Link key={movimiento.id} to="/bitacoras" className="block rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-[#F2B705]/30 hover:bg-white/[0.08] active:scale-[0.99]">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold">{movimiento.titulo}</p>
-                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold">{movimiento.tipo}</span>
+                    <span className="rounded-full bg-[#F2B705]/10 px-2.5 py-1 text-xs font-semibold text-[#FFF2E1]">{movimiento.tipo}</span>
                   </div>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <p className="mt-1 text-sm text-[#FFF2E1]/60">
                     {moto ? `${moto.marca} ${moto.modelo} · ${moto.placas}` : "Moto vinculada a trabajo anterior"}
                     {cliente ? ` · ${cliente.nombre}` : ""} · {formatDate(movimiento.created_at)}
                   </p>
@@ -83,17 +83,17 @@ export function DashboardPage() {
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-lg font-bold">Accesos rapidos</h2>
+          <h2 className="mb-3 text-lg font-semibold">Accesos rapidos</h2>
           <div className="grid gap-2">
             <Link to="/clientes/nuevo"><Button className="w-full" variant="secondary">Nuevo cliente</Button></Link>
             <Link to="/motocicletas/nueva"><Button className="w-full" variant="secondary">Registrar moto</Button></Link>
             <Link to="/bitacoras"><Button className="w-full" variant="secondary">Trabajar bitacora</Button></Link>
             <Link to="/cotizaciones"><Button className="w-full" variant="secondary">Cotizaciones</Button></Link>
           </div>
-          <div className="mt-4 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-600">
+          <div className="mt-4 rounded-2xl bg-[#0B0B0B]/45 p-3 text-sm text-[#FFF2E1]/75">
             Al registrar una moto se crea automaticamente su primera bitacora como recibida dentro del taller.
           </div>
-          <div className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-600">
+          <div className="mt-3 rounded-2xl bg-[#0B0B0B]/45 p-3 text-sm text-[#FFF2E1]/75">
             Cotizaciones creadas: <strong>{cotizaciones.length}</strong>
           </div>
         </Card>

@@ -15,13 +15,13 @@ export function KanbanPage() {
         {estadosOrden.map((estado) => (
           <section key={estado} className="min-w-[280px]">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase text-neutral-600">{estadoLabels[estado]}</h2>
-              <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-bold">{ordenes.filter((orden) => orden.estado === estado).length}</span>
+              <h2 className="text-sm font-semibold uppercase text-neutral-600">{estadoLabels[estado]}</h2>
+              <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-semibold">{ordenes.filter((orden) => orden.estado === estado).length}</span>
             </div>
             <div className="space-y-3">
               {ordenes.filter((orden) => orden.estado === estado).map((orden) => (
                 <Card key={orden.id}>
-                  <p className="font-bold">{orden.titulo}</p>
+                  <p className="font-semibold">{orden.titulo}</p>
                   <p className="mt-1 text-sm text-neutral-500">{getCliente(orden.cliente_id)?.nombre}</p>
                   <p className="text-sm text-neutral-500">{getMoto(orden.moto_id)?.marca} {getMoto(orden.moto_id)?.modelo}</p>
                   <div className="mt-3 flex items-center justify-between gap-2">

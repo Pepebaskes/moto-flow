@@ -10,10 +10,12 @@ export type StaffUser = {
   role: StaffRole;
 };
 
-const demoUsers: Record<string, StaffUser & { password: string }> = {
-  admin: { username: "admin", password: "123", name: "Administrador", role: "admin" },
-  mecanico: { username: "mecanico", password: "123", name: "Mecanico", role: "mecanico" },
-  "3411674336": { username: "3411674336", password: "contraseña123", name: "Rogelio Villa", role: "mecanico" },
+const demoUsers: Record<string, StaffUser & { passwords: string[] }> = {
+  admin: { username: "admin", passwords: ["123"], name: "Administrador", role: "admin" },
+  mecanico: { username: "mecanico", passwords: ["123"], name: "Mecanico", role: "mecanico" },
+  "3411674336": { username: "3411674336", passwords: ["contrase\u00f1a123", "contrasena123", "123"], name: "Rogelio Villa", role: "mecanico" },
+  pepebaskes: { username: "pepebaskes", passwords: ["Rafael388?", "123"], name: "pepebaskes", role: "admin" },
+  "rafaelvazquezsilva8@outlook.com": { username: "rafaelvazquezsilva8@outlook.com", passwords: ["Rafael388?", "123"], name: "pepebaskes", role: "admin" },
 };
 
 type LoginResult = { ok: true } | { ok: false; message: string };
@@ -31,14 +33,22 @@ function normalizePhone(value: string) {
   return value.trim();
 }
 
+function normalizeIdentifier(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.toLowerCase() === "pepebaskes") return "rafaelvazquezsilva8@outlook.com";
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 10) return `${digits}@motoflow.local`;
+  return trimmed;
+}
+
 function localLogin(username: string, password: string, set: (state: { user: StaffUser | null }) => void): LoginResult {
   const key = username.trim().toLowerCase();
   const match = demoUsers[key];
-  if (!match || match.password !== password) {
+  if (!match || !match.passwords.includes(password)) {
     return { ok: false, message: "Usuario o contraseña incorrectos." };
   }
 
-  const { password: _password, ...user } = match;
+  const { passwords: _passwords, ...user } = match;
   set({ user });
   return { ok: true };
 }
@@ -52,16 +62,13 @@ export const useAuthStore = create<AuthStore>()(
           return localLogin(username, password, set);
         }
 
-        const identifier = username.trim();
+        const identifier = normalizeIdentifier(username);
         const isEmail = identifier.includes("@");
-        const { data, error } = await supabase.auth.signInWithPassword(
-          isEmail ? { email: identifier, password } : { phone: normalizePhone(identifier), password },
-        );
+        const credentials = isEmail ? { email: identifier, password } : { phone: normalizePhone(identifier), password };
+        const { data, error } = await supabase.auth.signInWithPassword(credentials);
 
         if (error || !data.user) {
-          const fallback = localLogin(username, password, set);
-          if (fallback.ok) return fallback;
-          return { ok: false, message: "Usuario o contraseña incorrectos." };
+          return { ok: false, message: "No se pudo iniciar sesion en Supabase. Revisa usuario, contraseña y que el usuario exista en Auth." };
         }
 
         const { data: perfil } = await supabase

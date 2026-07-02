@@ -1,4 +1,4 @@
-import { Bike, BookOpen, FileText, Home, Users, Wrench } from "lucide-react";
+import { Bike, BookOpen, FileText, Home, LogOut, Menu, Users, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { AuthPage } from "@/features/auth/AuthPage";
@@ -14,21 +14,55 @@ const nav = [
   { to: "/cotizaciones", label: "Cotizaciones", icon: FileText },
 ];
 
-function NavItem({ item, mobile = false }: { item: (typeof nav)[number]; mobile?: boolean }) {
+function Brand() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="grid h-12 w-12 place-items-center rounded-2xl border border-[#F2B705]/20 bg-[#F2B705]/10 text-[#FFD08A] shadow-[0_0_28px_rgba(242,183,5,0.2)]">
+        <Bike className="h-6 w-6" />
+      </div>
+      <div>
+        <p className="text-lg font-semibold tracking-wide text-white">MOTO-FLOW</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFF2E1]/60">Taller de Motos Villa</p>
+      </div>
+    </div>
+  );
+}
+
+function NavItem({ item, onClick }: { item: (typeof nav)[number]; onClick?: () => void }) {
   const Icon = item.icon;
   return (
     <NavLink
       to={item.to}
       end={item.to === "/"}
+      onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center ${mobile ? "flex-col justify-center gap-1 text-[11px]" : "gap-3 rounded-lg px-3 py-2 text-sm"} font-semibold transition ${
-          isActive ? "bg-neutral-950 text-white" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
+        `group flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-semibold transition duration-200 active:scale-[0.98] ${
+          isActive
+            ? "bg-[#F2B705] text-[#0B0B0B] shadow-lg shadow-black/20"
+            : "text-[#FFF2E1]/60 hover:bg-white/8 hover:text-white"
         }`
       }
     >
-      <Icon className={mobile ? "h-5 w-5" : "h-4 w-4"} />
+      <Icon className="h-5 w-5 transition group-hover:scale-110" />
       {item.label}
     </NavLink>
+  );
+}
+
+function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <div className="flex h-full flex-col overflow-y-auto bg-[#0B0B0B] px-4 py-5 text-white">
+      <Brand />
+      <nav className="mt-8 space-y-2">
+        {nav.map((item) => (
+          <NavItem key={item.to} item={item} onClick={onNavigate} />
+        ))}
+      </nav>
+      <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-[#FFF2E1]/75">
+        <p className="font-semibold text-white">Flujo activo</p>
+        <p className="mt-1">Cliente, moto, bitacora y cotizacion en un solo expediente.</p>
+      </div>
+    </div>
   );
 }
 
@@ -40,6 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const error = useWorkshopStore((state) => state.error);
   const loadFromSupabase = useWorkshopStore((state) => state.loadFromSupabase);
   const [hasSession, setHasSession] = useState(!hasSupabaseCredentials);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!supabase || !user) return;
@@ -58,60 +93,78 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, [loadFromSupabase, user]);
 
-  if (!user) {
-    return <AuthPage />;
-  }
+  if (!user) return <AuthPage />;
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-950">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-neutral-200 bg-white p-4 lg:block">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-neutral-950 text-white">
-            <Wrench className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">MotoFlow</p>
-            <p className="text-xs text-neutral-500">Taller de motocicletas</p>
-          </div>
-        </div>
-        <nav className="space-y-1">
-          {nav.map((item) => (
-            <NavItem key={item.to} item={item} />
-          ))}
-        </nav>
+    <div className="min-h-screen overflow-x-hidden bg-[#0B0B0B] text-[#FFF2E1]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 lg:block">
+        <Sidebar />
       </aside>
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-neutral-500">MotoFlow</p>
-              <p className="text-lg font-bold">Panel del taller</p>
+      {menuOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Cerrar menu"
+            className="absolute inset-0 bg-[#0B0B0B]/70 backdrop-blur-sm"
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 w-[min(82vw,320px)] animate-[slideIn_.22s_ease-out] border-r border-white/10 shadow-2xl">
+            <div className="absolute right-3 top-3 z-10">
+              <button
+                type="button"
+                className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15 active:scale-95"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Cerrar menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-600">
-                {usingSupabase ? (hasSession ? "Supabase activo" : "Supabase sin Auth") : "Modo local"}
+            <Sidebar onNavigate={() => setMenuOpen(false)} />
+          </aside>
+        </div>
+      ) : null}
+
+      <div className="min-w-0 lg:pl-72">
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0B0B0B]/85 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/8 text-white transition hover:bg-[#F2B705] hover:text-[#0B0B0B] active:scale-95 lg:hidden"
+                onClick={() => setMenuOpen(true)}
+                aria-label="Abrir menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-[#FFD08A]">MotoFlow</p>
+                <p className="truncate text-lg font-semibold text-white">Panel del taller</p>
+              </div>
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-[#FFF2E1]/75 sm:inline-flex">
+                {usingSupabase ? (hasSession ? "Supabase activo" : "Supabase conectado") : "Modo local"}
               </span>
-              <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">
-                {user.name} · {user.role}
+              <span className="max-w-[140px] truncate rounded-full bg-[#F2B705]/10 px-3 py-1 text-xs font-semibold text-[#FFF2E1] sm:max-w-none">
+                {user.name}
               </span>
-              <button className="text-xs font-semibold text-neutral-500 hover:text-neutral-950" onClick={() => { void supabase?.auth.signOut(); logout(); }}>
-                Salir
+              <button
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/8 text-[#FFF2E1]/75 transition hover:bg-red-500 hover:text-white active:scale-95"
+                onClick={() => logout()}
+                aria-label="Salir"
+                type="button"
+              >
+                <LogOut className="h-4 w-4" />
               </button>
             </div>
           </div>
-          {isLoading ? <p className="mt-2 text-xs font-semibold text-neutral-500">Cargando datos de Supabase...</p> : null}
-          {error ? <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{error}</p> : null}
+          {isLoading ? <p className="mt-2 text-xs font-semibold text-[#FFF2E1]/60">Cargando datos de Supabase...</p> : null}
+          {error ? <p className="mt-2 rounded-2xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200">{error}</p> : null}
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-5 pb-24 lg:px-8 lg:pb-8">{children}</main>
+        <main className="mx-auto min-w-0 max-w-7xl px-4 py-5 sm:px-6 lg:px-8">{children}</main>
       </div>
-
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-neutral-200 bg-white px-2 py-2 lg:hidden">
-        {nav.map((item) => (
-          <NavItem key={item.to} item={item} mobile />
-        ))}
-      </nav>
     </div>
   );
 }

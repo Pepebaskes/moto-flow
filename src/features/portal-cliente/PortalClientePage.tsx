@@ -15,6 +15,10 @@ type PortalData = {
   evidencias: Evidencia[];
 };
 
+const lightCard = "border-[#2F2A24]/10 bg-white text-[#0B0B0B] shadow-xl shadow-[#2F2A24]/15";
+const lightInput =
+  "border-[#2F2A24]/20 bg-white text-[#0B0B0B] placeholder:text-[#2F2A24]/45 hover:border-[#F2B705] focus:border-[#F2B705] focus:bg-white focus:ring-[#F2B705]/30";
+
 function normalizeRemoteData(data: unknown): PortalData | null {
   if (!data || typeof data !== "object") return null;
   const value = data as { moto?: Motocicleta; cliente?: Pick<Cliente, "nombre">; movimientos?: MovimientoOrden[]; evidencias?: Evidencia[] };
@@ -99,70 +103,70 @@ export function PortalClientePage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 py-8 text-neutral-950">
+    <div className="min-h-screen bg-[#FFF2E1] px-4 py-8 text-[#0B0B0B]">
       <main className="mx-auto max-w-3xl">
         <div className="mb-6">
-          <p className="text-sm font-semibold text-neutral-500">MotoFlow</p>
-          <h1 className="text-3xl font-bold">Consulta tu motocicleta</h1>
-          <p className="mt-2 text-sm text-neutral-500">Ingresa tus placas, nombre o numero de serie para ver la bitacora publica.</p>
+          <p className="text-sm font-semibold text-[#8A6400]">MotoFlow</p>
+          <h1 className="text-3xl font-semibold text-[#0B0B0B]">Consulta tu motocicleta</h1>
+          <p className="mt-2 text-sm text-[#2F2A24]/75">Ingresa tus placas, nombre o numero de serie para ver la bitacora publica.</p>
         </div>
 
-        <Card className="mb-5">
+        <Card className={`mb-5 ${lightCard}`}>
           <form className="flex flex-col gap-2 sm:flex-row" onSubmit={search}>
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ej. ABC123 o Ana Martinez" />
+            <Input className={lightInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ej. ABC123 o Ana Martinez" />
             <Button type="submit">Consultar</Button>
           </form>
         </Card>
 
-        {loading ? <Card><p className="font-semibold">Buscando en Supabase...</p></Card> : null}
-        {error ? <Card><p className="font-semibold text-red-700">{error}</p></Card> : null}
+        {loading ? <Card className={lightCard}><p className="font-semibold">Buscando en Supabase...</p></Card> : null}
+        {error ? <Card className="border-red-200 bg-white text-[#0B0B0B]"><p className="font-semibold text-red-700">{error}</p></Card> : null}
 
         {codigo && !loading && !data ? (
-          <Card>
+          <Card className={lightCard}>
             <p className="font-semibold">No encontramos una moto con esas placas o nombre.</p>
           </Card>
         ) : null}
 
         {data ? (
           <div className="space-y-5">
-            <Card className="space-y-5">
+            <Card className={`space-y-5 ${lightCard}`}>
               <div>
-                <p className="text-sm text-neutral-500">Ultimo avance: {ultimoMovimiento?.titulo ?? "Sin avances publicos"}</p>
-                <h2 className="text-2xl font-bold">{data.moto.marca} {data.moto.modelo}</h2>
-                <p className="text-sm text-neutral-500">{data.moto.anio} · Placas {data.moto.placas} · {data.moto.color}</p>
+                <p className="text-sm text-[#2F2A24]/70">Ultimo avance: {ultimoMovimiento?.titulo ?? "Sin avances publicos"}</p>
+                <h2 className="text-2xl font-semibold text-[#0B0B0B]">{data.moto.marca} {data.moto.modelo}</h2>
+                <p className="text-sm text-[#2F2A24]/75">{data.moto.anio} · Placas {data.moto.placas} · {data.moto.color}</p>
               </div>
-              <div className="grid gap-3 rounded-lg bg-neutral-50 p-4 sm:grid-cols-3">
-                <div><p className="text-xs font-semibold uppercase text-neutral-500">Fecha estimada</p><p className="font-semibold">{fechaEstimada ? shortDate(fechaEstimada) : "Por confirmar"}</p></div>
-                <div><p className="text-xs font-semibold uppercase text-neutral-500">Cotizacion</p><p className="font-semibold">{currency(cotizacionActual)}</p></div>
-                <div><p className="text-xs font-semibold uppercase text-neutral-500">Cliente</p><p className="font-semibold">{data.cliente?.nombre ?? "Registrado"}</p></div>
+              <div className="grid gap-3 rounded-2xl bg-[#FFF2E1] p-4 sm:grid-cols-3">
+                <div><p className="text-xs font-semibold uppercase text-[#2F2A24]/70">Fecha estimada</p><p className="font-semibold text-[#0B0B0B]">{fechaEstimada ? shortDate(fechaEstimada) : "Por confirmar"}</p></div>
+                <div><p className="text-xs font-semibold uppercase text-[#2F2A24]/70">Cotizacion</p><p className="font-semibold text-[#0B0B0B]">{currency(cotizacionActual)}</p></div>
+                <div><p className="text-xs font-semibold uppercase text-[#2F2A24]/70">Cliente</p><p className="font-semibold text-[#0B0B0B]">{data.cliente?.nombre ?? "Registrado"}</p></div>
               </div>
             </Card>
 
-            <Card>
-              <h2 className="mb-3 text-lg font-bold">Bitacora y avances</h2>
+            <Card className={lightCard}>
+              <h2 className="mb-3 text-lg font-semibold text-[#0B0B0B]">Bitacora y avances</h2>
               <div className="space-y-3">
-                {data.movimientos.length === 0 ? <p className="text-sm text-neutral-500">Aun no hay avances visibles para el cliente.</p> : null}
+                {data.movimientos.length === 0 ? <p className="text-sm text-[#2F2A24]/70">Aun no hay avances visibles para el cliente.</p> : null}
                 {data.movimientos.map((movimiento) => (
-                  <div key={movimiento.id} className="rounded-lg border border-neutral-200 p-3">
+                  <div key={movimiento.id} className="rounded-2xl border border-[#2F2A24]/12 bg-white p-3">
                     <div className="flex flex-wrap justify-between gap-2">
-                      <p className="font-bold">{movimiento.titulo}</p>
-                      {movimiento.costo ? <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold">{currency(movimiento.costo)}</span> : null}
+                      <p className="font-semibold text-[#0B0B0B]">{movimiento.titulo}</p>
+                      {movimiento.costo ? <span className="rounded-full bg-[#F2B705] px-2.5 py-1 text-xs font-semibold text-[#0B0B0B]">{currency(movimiento.costo)}</span> : null}
                     </div>
-                    <p className="text-xs font-semibold uppercase text-neutral-500">{new Date(movimiento.created_at).toLocaleString("es-MX")} · {movimiento.tipo}</p>
-                    {movimiento.nota ? <p className="mt-2 whitespace-pre-line text-sm text-neutral-700">{movimiento.nota}</p> : null}
+                    <p className="text-xs font-semibold uppercase text-[#2F2A24]/70">{new Date(movimiento.created_at).toLocaleString("es-MX")} · {movimiento.tipo}</p>
+                    {movimiento.nota ? <p className="mt-2 whitespace-pre-line text-sm text-[#2F2A24]">{movimiento.nota}</p> : null}
                   </div>
                 ))}
               </div>
             </Card>
 
             {data.evidencias.length ? (
-              <Card>
-                <h2 className="mb-3 text-lg font-bold">Evidencias</h2>
+              <Card className={lightCard}>
+                <h2 className="mb-3 text-lg font-semibold text-[#0B0B0B]">Evidencias</h2>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {data.evidencias.map((evidencia) => (
-                    <a key={evidencia.id} href={evidencia.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+                    <a key={evidencia.id} href={evidencia.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-2xl border border-[#2F2A24]/12 bg-white">
                       <img src={evidencia.url} alt={evidencia.nota || evidencia.tipo} className="h-32 w-full object-cover" />
-                      <p className="p-2 text-xs font-semibold">{evidencia.nota || evidencia.tipo}</p>
+                      <p className="p-2 text-xs font-semibold text-[#0B0B0B]">{evidencia.nota || evidencia.tipo}</p>
                     </a>
                   ))}
                 </div>
