@@ -40,13 +40,13 @@ export function AuthPage() {
                 <Bike className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-xl font-semibold tracking-wide">MOTO-FLOW</p>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFF2E1]/60">Taller de Motos Villa</p>
+                <p className="text-xl font-semibold tracking-wide">Taller Villa</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFF2E1]/60">Servicio de motocicletas</p>
               </div>
             </div>
 
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Acceso del taller</h1>
-            <p className="mt-2 text-sm font-medium text-[#FFF2E1]/60">Gestiona motos, clientes, bitacoras y cotizaciones desde un panel privado.</p>
+            <p className="mt-2 text-sm font-medium text-[#FFF2E1]/60">Diagnostico, mantenimiento y reparacion de motos con seguimiento claro para cada cliente.</p>
 
             <form className="mt-8 grid gap-4" onSubmit={submitStaff}>
               <Field label="Telefono, correo o usuario">
@@ -67,6 +67,7 @@ export function AuthPage() {
 
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
               <p className="text-sm font-semibold">Consulta del cliente</p>
+              <p className="mt-1 text-xs leading-5 text-[#FFF2E1]/58">Revisa el avance de tu moto con placas, nombre o numero de serie.</p>
               <form className="mt-3 grid gap-3" onSubmit={submitClient}>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#FFF2E1]/45" />
@@ -74,18 +75,31 @@ export function AuthPage() {
                 </div>
                 <Button type="submit" variant="secondary">Ver avance</Button>
               </form>
+              <a
+                className="mt-3 inline-flex w-full min-h-11 items-center justify-center rounded-2xl bg-green-500 px-5 text-sm font-semibold text-white transition hover:bg-green-400 active:scale-[0.98]"
+                href={`https://wa.me/${workshopWhatsApp}?text=${workshopWhatsAppMessage}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Contactar por WhatsApp
+              </a>
             </div>
           </div>
 
           <div className="relative hidden min-h-[620px] overflow-hidden xl:block">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(103,232,249,0.35),transparent_24rem),radial-gradient(circle_at_80%_40%,rgba(59,130,246,0.35),transparent_26rem),linear-gradient(135deg,#0f172a,#020617)]" />
-            <div className="absolute left-10 top-10 rounded-full border border-[#F2B705]/20 px-4 py-2 text-sm font-semibold text-[#FFF2E1]">Taller conectado</div>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(242,183,5,0.26),transparent_24rem),radial-gradient(circle_at_80%_40%,rgba(255,208,138,0.18),transparent_26rem),linear-gradient(135deg,#0B0B0B,#2F2A24)]" />
+            <div className="absolute left-10 top-10 rounded-full border border-[#F2B705]/25 px-4 py-2 text-sm font-semibold text-[#FFF2E1]">Taller Villa</div>
             <div className="absolute inset-x-10 bottom-10 rounded-[2rem] border border-white/10 bg-[#0B0B0B]/35 p-8 backdrop-blur">
               <Bike className="h-16 w-16 text-[#FFD08A]" />
-              <h2 className="mt-5 text-5xl font-semibold tracking-tight">Servicio claro, avance visible.</h2>
+              <h2 className="mt-5 text-5xl font-semibold tracking-tight">Tu moto en buenas manos.</h2>
               <p className="mt-4 max-w-lg text-sm leading-6 text-[#FFF2E1]/75">
-                El mecanico registra avances y el cliente consulta sin interrumpir el flujo del taller.
+                Servicio preventivo, diagnostico, reparacion y cotizaciones claras. Consulta el avance de tu moto sin llamadas innecesarias.
               </p>
+              <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-[#0B0B0B]">
+                <span className="rounded-2xl bg-[#F2B705] px-3 py-2">Diagnostico</span>
+                <span className="rounded-2xl bg-[#FFD08A] px-3 py-2">Mantenimiento</span>
+                <span className="rounded-2xl bg-[#FFF2E1] px-3 py-2">Reparacion</span>
+              </div>
               <a
                 className="mt-6 inline-flex min-h-11 items-center justify-center rounded-2xl bg-green-500 px-5 text-sm font-semibold text-white transition hover:bg-green-400 active:scale-[0.98]"
                 href={`https://wa.me/${workshopWhatsApp}?text=${workshopWhatsAppMessage}`}

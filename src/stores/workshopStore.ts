@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { mockData } from "@/lib/mockData";
-import { hasSupabaseCredentials, storageBucket, supabase } from "@/lib/supabase";
+import { allowLocalMode, hasSupabaseCredentials, storageBucket, supabase } from "@/lib/supabase";
 import type { Cliente, Cotizacion, EstadoOrden, Evidencia, Motocicleta, MovimientoOrden, OrdenTrabajo, TipoEvidencia, WorkshopState } from "@/types/motoflow";
 import { createPublicCode, uid } from "@/utils/format";
 
@@ -85,6 +85,7 @@ function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "
 }
 
 async function requireTallerId(_current?: string) {
+  if (!supabase && !allowLocalMode) throw new Error("Supabase no esta configurado. No se puede guardar en la base de datos.");
   if (!supabase) return localTallerId;
 
   const { data: sessionData } = await supabase.auth.getSession();
@@ -136,7 +137,7 @@ async function deleteRow(table: string, id: string) {
 export const useWorkshopStore = create<Store>()(
   persist(
     (set, get) => ({
-      ...mockData,
+      ...(allowLocalMode ? mockData : { clientes: [], motocicletas: [], ordenes: [], evidencias: [], movimientos: [], cotizaciones: [] }),
       usingSupabase: hasSupabaseCredentials,
       isLoading: false,
       error: undefined,
@@ -471,15 +472,18 @@ export const useWorkshopStore = create<Store>()(
       getOrden: (id) => get().ordenes.find((orden) => orden.id === id),
     }),
     {
-      name: "motoflow-workshop",
-      partialize: (state) => ({
-        clientes: state.clientes,
-        motocicletas: state.motocicletas,
-        ordenes: state.ordenes,
-        evidencias: state.evidencias,
-        movimientos: state.movimientos,
-        cotizaciones: state.cotizaciones,
-      }),
+      name: allowLocalMode ? "motoflow-workshop-local" : "motoflow-workshop-supabase",
+      partialize: (state) =>
+        allowLocalMode
+          ? {
+              clientes: state.clientes,
+              motocicletas: state.motocicletas,
+              ordenes: state.ordenes,
+              evidencias: state.evidencias,
+              movimientos: state.movimientos,
+              cotizaciones: state.cotizaciones,
+            }
+          : {},
     },
   ),
 );

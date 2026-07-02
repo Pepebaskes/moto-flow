@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { hasSupabaseCredentials, supabase } from "@/lib/supabase";
+import { allowLocalMode, hasSupabaseCredentials, supabase } from "@/lib/supabase";
 
 export type StaffRole = "admin" | "mecanico";
 
@@ -59,6 +59,12 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       login: async (username, password) => {
         if (!hasSupabaseCredentials || !supabase) {
+          if (!allowLocalMode) {
+            return {
+              ok: false,
+              message: "Supabase no esta configurado en esta instalacion. Revisa las variables de entorno y vuelve a desplegar.",
+            };
+          }
           return localLogin(username, password, set);
         }
 
