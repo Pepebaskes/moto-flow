@@ -18,7 +18,7 @@ type PortalData = {
 
 const lightCard = "border-[#2F2A24]/10 bg-white text-[#0B0B0B] shadow-xl shadow-[#2F2A24]/12";
 const lightInput =
-  "border-[#2F2A24]/20 bg-white text-[#0B0B0B] placeholder:text-[#2F2A24]/45 hover:border-[#F2B705] focus:border-[#F2B705] focus:bg-white focus:ring-[#F2B705]/30";
+  "border-[#2F2A24]/20 !bg-white !text-[#0B0B0B] placeholder:!text-[#2F2A24]/45 hover:border-[#F2B705] focus:border-[#F2B705] focus:!bg-white focus:ring-[#F2B705]/30";
 
 function normalizeRemoteData(data: unknown): PortalData | null {
   if (!data || typeof data !== "object") return null;
@@ -40,6 +40,10 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function normalizeLookup(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 }
 
 export function PortalClientePage() {
@@ -74,7 +78,7 @@ export function PortalClientePage() {
 
   const localData = useMemo<PortalData | null>(() => {
     if (!codigo) return null;
-    const normalized = codigo.replaceAll(" ", "").toLowerCase();
+    const normalized = normalizeLookup(codigo);
     const text = codigo.toLowerCase();
 
     const moto = motocicletas.find((item) => {
@@ -82,8 +86,8 @@ export function PortalClientePage() {
       const ordenLegacy = ordenes.find((orden) => orden.moto_id === item.id && orden.codigo_publico.toLowerCase() === text);
 
       return (
-        item.placas.replaceAll(" ", "").toLowerCase() === normalized ||
-        item.numero_serie?.replaceAll(" ", "").toLowerCase() === normalized ||
+        normalizeLookup(item.placas) === normalized ||
+        normalizeLookup(item.numero_serie ?? "") === normalized ||
         cliente?.nombre.toLowerCase().includes(text) ||
         Boolean(ordenLegacy)
       );
@@ -110,9 +114,10 @@ export function PortalClientePage() {
   }, [clientes, codigo, evidencias, motocicletas, movimientos, ordenes]);
 
   const data = remoteData ?? localData;
-  const cotizacionActual = data ? data.movimientos.reduce((sum, movimiento) => sum + (Number(movimiento.costo) || 0), 0) : 0;
+  const movimientosPublicos = data?.movimientos ?? [];
+  const cotizacionActual = movimientosPublicos.reduce((sum, movimiento) => sum + (Number(movimiento.costo) || 0), 0);
   const fechaEstimada = data?.moto.fecha_estimada_salida ?? "";
-  const ultimoMovimiento = data?.movimientos[0];
+  const ultimoMovimiento = movimientosPublicos[0];
 
   function search(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -120,21 +125,21 @@ export function PortalClientePage() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#FFF2E1] px-3 py-5 text-[#0B0B0B] sm:px-5 sm:py-8">
-      <main className="mx-auto w-full max-w-3xl min-w-0">
-        <div className="mb-5 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8A6400]">Taller Villa</p>
-          <h1 className="mt-2 break-words text-2xl font-semibold text-[#0B0B0B] sm:text-3xl">Consulta tu motocicleta</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#2F2A24]/75">Ingresa placas, nombre o numero de serie para ver avances publicos.</p>
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#FFF2E1] px-3 py-4 text-[#0B0B0B] sm:px-5 sm:py-8">
+      <main className="mx-auto w-full max-w-2xl min-w-0">
+        <div className="mb-4 min-w-0 rounded-3xl bg-[#0B0B0B] p-5 text-white shadow-xl shadow-[#2F2A24]/25">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F2B705]">Taller Villa</p>
+          <h1 className="mt-2 break-words text-2xl font-semibold sm:text-3xl">Consulta tu motocicleta</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#FFF2E1]/72">Ingresa placas, nombre o numero de serie para ver avances publicos.</p>
         </div>
 
-        <Card className={`mb-4 ${lightCard}`}>
-          <form className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={search}>
+        <Card className={`mb-4 rounded-3xl p-3 ${lightCard}`}>
+          <form className="grid min-w-0 gap-2" onSubmit={search}>
             <div className="relative min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2F2A24]/45" />
               <Input className={`${lightInput} pl-10`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ej. ABC123 o Ana Martinez" />
             </div>
-            <Button type="submit" className="w-full sm:w-auto">Consultar</Button>
+            <Button type="submit" className="w-full">Consultar</Button>
           </form>
         </Card>
 
@@ -149,16 +154,17 @@ export function PortalClientePage() {
 
         {data ? (
           <div className="min-w-0 space-y-4">
-            <Card className={`min-w-0 ${lightCard}`}>
+            <Card className={`min-w-0 rounded-3xl p-4 ${lightCard}`}>
               <div className="min-w-0">
-                <p className="break-words text-sm text-[#2F2A24]/70">Ultimo avance: {ultimoMovimiento?.titulo ?? "Sin avances publicos"}</p>
+                <p className="break-words text-xs font-semibold uppercase text-[#8A6400]">Ultimo avance</p>
+                <p className="mt-1 break-words text-sm font-semibold text-[#2F2A24]">{ultimoMovimiento?.titulo ?? "Sin avances publicos"}</p>
                 <h2 className="mt-1 break-words text-2xl font-semibold text-[#0B0B0B]">{data.moto.marca} {data.moto.modelo}</h2>
                 <p className="mt-1 break-words text-sm text-[#2F2A24]/75">
                   {data.moto.anio} | Placas {data.moto.placas} | {data.moto.color}
                 </p>
               </div>
 
-              <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="mt-4 grid min-w-0 grid-cols-1 gap-2">
                 <div className="min-w-0 rounded-2xl bg-[#FFF2E1] p-3">
                   <CalendarDays className="mb-2 h-4 w-4 text-[#8A6400]" />
                   <p className="text-xs font-semibold uppercase text-[#2F2A24]/65">Fecha estimada</p>
@@ -177,16 +183,27 @@ export function PortalClientePage() {
               </div>
             </Card>
 
-            <Card className={`min-w-0 ${lightCard}`}>
-              <h2 className="mb-3 text-lg font-semibold text-[#0B0B0B]">Avances del trabajo</h2>
+            <Card className={`min-w-0 rounded-3xl p-4 ${lightCard}`}>
+              <div className="mb-3 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8A6400]">Historial publico</p>
+                <h2 className="mt-1 text-xl font-semibold text-[#0B0B0B]">Avances del trabajo</h2>
+              </div>
               <div className="min-w-0 space-y-3">
-                {data.movimientos.length === 0 ? <p className="text-sm text-[#2F2A24]/70">Aun no hay avances visibles para el cliente.</p> : null}
-                {data.movimientos.map((movimiento) => (
-                  <article key={movimiento.id} className="min-w-0 rounded-2xl border border-[#2F2A24]/12 bg-white p-3">
-                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                {movimientosPublicos.length === 0 ? (
+                  <div className="rounded-2xl bg-[#FFF2E1] p-4 text-sm text-[#2F2A24]/75">
+                    Aun no hay avances visibles para el cliente.
+                  </div>
+                ) : null}
+                {movimientosPublicos.map((movimiento, index) => (
+                  <article key={movimiento.id} className="relative min-w-0 rounded-2xl border border-[#2F2A24]/12 bg-[#FFFDF9] p-3 pl-4">
+                    <div className="absolute left-0 top-4 h-8 w-1 rounded-r-full bg-[#F2B705]" />
+                    <div className="flex min-w-0 flex-col gap-2">
                       <div className="min-w-0">
-                        <p className="break-words font-semibold text-[#0B0B0B]">{movimiento.titulo}</p>
-                        <p className="mt-1 flex flex-wrap items-center gap-1 text-xs font-semibold uppercase text-[#2F2A24]/66">
+                        <div className="mb-1 flex min-w-0 items-center gap-2">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#0B0B0B] text-xs font-semibold text-[#F2B705]">{index + 1}</span>
+                          <p className="min-w-0 break-words font-semibold text-[#0B0B0B]">{movimiento.titulo}</p>
+                        </div>
+                        <p className="mt-1 flex flex-wrap items-center gap-1 break-words text-xs font-semibold uppercase text-[#2F2A24]/66">
                           <Clock3 className="h-3.5 w-3.5" />
                           <span>{formatDate(movimiento.created_at)}</span>
                           <span>|</span>
@@ -206,12 +223,12 @@ export function PortalClientePage() {
             </Card>
 
             {data.evidencias.length ? (
-              <Card className={`min-w-0 ${lightCard}`}>
+              <Card className={`min-w-0 rounded-3xl p-4 ${lightCard}`}>
                 <div className="mb-3 flex min-w-0 items-center gap-2">
                   <Camera className="h-5 w-5 text-[#8A6400]" />
                   <h2 className="text-lg font-semibold text-[#0B0B0B]">Evidencias</h2>
                 </div>
-                <div className="grid min-w-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3">
+                <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                   {data.evidencias.map((evidencia) => (
                     <a key={evidencia.id} href={evidencia.url} target="_blank" rel="noreferrer" className="min-w-0 overflow-hidden rounded-2xl border border-[#2F2A24]/12 bg-white">
                       <img src={evidencia.url} alt={evidencia.nota || evidencia.tipo} className="h-44 w-full object-cover sm:h-32" />

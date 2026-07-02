@@ -233,13 +233,16 @@ set search_path = public
 as $$
 declare
   resultado jsonb;
+  busqueda_limpia text;
 begin
+  busqueda_limpia := lower(regexp_replace(coalesce(p_busqueda, ''), '[^a-zA-Z0-9]', '', 'g'));
+
   with moto_encontrada as (
     select m.*, c.nombre as cliente_nombre
     from public.motocicletas m
     join public.clientes c on c.id = m.cliente_id
-    where lower(replace(m.placas, ' ', '')) = lower(replace(p_busqueda, ' ', ''))
-       or lower(coalesce(m.numero_serie, '')) = lower(replace(p_busqueda, ' ', ''))
+    where lower(regexp_replace(coalesce(m.placas, ''), '[^a-zA-Z0-9]', '', 'g')) = busqueda_limpia
+       or lower(regexp_replace(coalesce(m.numero_serie, ''), '[^a-zA-Z0-9]', '', 'g')) = busqueda_limpia
        or lower(c.nombre) like '%' || lower(p_busqueda) || '%'
        or exists (
         select 1
