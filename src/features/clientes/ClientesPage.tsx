@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, Eye, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/Button";
@@ -6,13 +6,18 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Input, Select } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
+import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
+import { downloadCsv } from "@/utils/csv";
+import { canManageWorkshop } from "@/utils/permissions";
 import { includesSearch, isWithinDateFilter } from "@/utils/search";
 
 export function ClientesPage() {
   const clientes = useWorkshopStore((state) => state.clientes);
   const motocicletas = useWorkshopStore((state) => state.motocicletas);
   const deleteCliente = useWorkshopStore((state) => state.deleteCliente);
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canManageWorkshop(user);
   const location = useLocation();
   const navigate = useNavigate();
   const [notice, setNotice] = useState("");
@@ -55,6 +60,24 @@ export function ClientesPage() {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [clientes, dateFilter, motocicletas, query]);
 
+  function exportClientesCsv() {
+    downloadCsv(
+      `clientes-taller-villa-${new Date().toISOString().slice(0, 10)}.csv`,
+      filteredClientes.map((cliente) => {
+        const motosCliente = motocicletas.filter((moto) => moto.cliente_id === cliente.id);
+        return {
+          nombre: cliente.nombre,
+          telefono: cliente.telefono,
+          localidad: cliente.localidad || "",
+          notas: cliente.notas || "",
+          motos: motosCliente.length,
+          placas: motosCliente.map((moto) => moto.placas).join(" | "),
+          registrado: new Date(cliente.created_at).toLocaleString("es-MX"),
+        };
+      }),
+    );
+  }
+
   return (
     <div className="min-w-0">
       {notice ? (
@@ -64,7 +87,20 @@ export function ClientesPage() {
         </div>
       ) : null}
 
-      <PageHeader title="Clientes" subtitle="Directorio del taller." actions={<Link to="/clientes/nuevo"><Button>Nuevo cliente</Button></Link>} />
+      <PageHeader
+        title="Clientes"
+        subtitle="Directorio del taller."
+        actions={
+          <>
+            {canDelete && clientes.length > 0 ? (
+              <Button type="button" variant="secondary" onClick={exportClientesCsv}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+            ) : null}
+            <Link to="/clientes/nuevo"><Button>Nuevo cliente</Button></Link>
+          </>
+        }
+      />
       {clientes.length === 0 ? <EmptyState title="Aun no hay clientes" /> : null}
 
       {clientes.length > 0 ? (
@@ -120,9 +156,11 @@ export function ClientesPage() {
                     <Link to={`/clientes/${cliente.id}`} className="inline-flex min-h-11 min-w-0 max-w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-3 text-sm font-semibold text-[#FFF2E1] transition hover:border-[#F2B705]/35 hover:bg-white/12 active:scale-[0.98]">
                       <Eye className="h-4 w-4 shrink-0" /> Ver
                     </Link>
-                    <Button type="button" variant="danger" className="w-full lg:w-auto" onClick={() => void removeCliente(cliente.id, cliente.nombre)}>
-                      <Trash2 className="h-4 w-4 shrink-0" /> Eliminar
-                    </Button>
+                    {canDelete ? (
+                      <Button type="button" variant="danger" className="w-full lg:w-auto" onClick={() => void removeCliente(cliente.id, cliente.nombre)}>
+                        <Trash2 className="h-4 w-4 shrink-0" /> Eliminar
+                      </Button>
+                    ) : null}
                   </div>
                 </article>
               );

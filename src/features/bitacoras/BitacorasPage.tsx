@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, FileClock, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, FileClock, MessageCircle, PackageCheck, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/Button";
@@ -6,10 +6,13 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
+import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
 import type { MovimientoOrden } from "@/types/motoflow";
 import { currency, shortDate } from "@/utils/format";
+import { canManageWorkshop } from "@/utils/permissions";
 import { includesSearch, isWithinDateFilter, normalizeSearch } from "@/utils/search";
+import { buildWhatsAppUrl, buildWorkHistoryWhatsAppMessage } from "@/utils/whatsapp";
 import { estadoOperativoLabels, estadosOperativos, isTrabajoActivo, prioridadTrabajoLabels, prioridadesTrabajo, priorityTone, tamanoTrabajoLabels, tamanosTrabajo, tipoTrabajoLabels, tiposTrabajo } from "@/utils/workflow";
 
 type Tab = "avance" | "fecha" | "historial";
@@ -42,14 +45,18 @@ function isAutoEntrada(movimiento: MovimientoOrden) {
 
 export function BitacorasPage() {
   const store = useWorkshopStore();
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canManageWorkshop(user);
   const [motoId, setMotoId] = useState("");
   const [tab, setTab] = useState<Tab>("avance");
   const [saving, setSaving] = useState(false);
   const [savingDate, setSavingDate] = useState(false);
+  const [delivering, setDelivering] = useState(false);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [lastWhatsAppUrl, setLastWhatsAppUrl] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -136,7 +143,20 @@ export function BitacorasPage() {
   function closeMoto() {
     setMotoId("");
     setTab("avance");
+    setLastWhatsAppUrl("");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function getWhatsAppUrl(nextHistorial = historial) {
+    if (!moto || !cliente?.telefono) return "";
+    return buildWhatsAppUrl(
+      cliente.telefono,
+      buildWorkHistoryWhatsAppMessage({
+        cliente,
+        moto,
+        historial: nextHistorial,
+      }),
+    );
   }
 
   async function removeMovimiento(id: string, titulo: string) {
@@ -198,6 +218,11 @@ export function BitacorasPage() {
       }
 
       formElement.reset();
+      if (publico && movimiento) {
+        setLastWhatsAppUrl(getWhatsAppUrl([movimiento, ...historial.filter((item) => item.id !== movimiento.id)]));
+      } else {
+        setLastWhatsAppUrl("");
+      }
       showNotice(fotos.length > 0 ? `Trabajo actualizado correctamente con ${fotos.length} foto(s).` : "Trabajo actualizado correctamente.");
       setTab("historial");
     } catch (error) {
@@ -216,6 +241,32 @@ export function BitacorasPage() {
     await store.updateMotoFechaEstimada(moto.id, String(form.get("fecha_estimada_salida") || ""));
     setSavingDate(false);
     setTab("historial");
+  }
+
+  async function deliverMoto() {
+    if (!moto) return;
+    if (!window.confirm("Marcar esta moto como entregada? Se quitara de Trabajos activos y quedara guardada en Historial.")) return;
+
+    setDelivering(true);
+    try {
+      await store.addMovimiento({
+        moto_id: moto.id,
+        tipo: "salida",
+        titulo: "Moto entregada",
+        nota: "Trabajo cerrado y motocicleta entregada al cliente. El expediente queda disponible en historial para futuras consultas.",
+        publico: true,
+        kilometraje: moto.kilometraje,
+      });
+      await store.deactivateMoto(moto.id);
+      setMotoId("");
+      setLastWhatsAppUrl("");
+      showNotice("Moto marcada como entregada. Se movio al historial.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "No se pudo cerrar el trabajo.");
+    } finally {
+      setDelivering(false);
+    }
   }
 
   if (!moto) {
@@ -315,6 +366,20 @@ export function BitacorasPage() {
         </div>
       ) : null}
 
+      {lastWhatsAppUrl ? (
+        <Card className="border-[#F2B705]/25 bg-[#151515]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-semibold text-white">Trabajo guardado. WhatsApp opcional listo.</p>
+              <p className="mt-1 text-sm text-[#FFF2E1]/62">Se abrira el chat del cliente con el historial ya escrito. El mecanico decide si lo envia.</p>
+            </div>
+            <a href={lastWhatsAppUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-[#0B0B0B] transition hover:bg-[#7CFFA8] active:scale-[0.98]">
+              <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
+            </a>
+          </div>
+        </Card>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
@@ -352,6 +417,15 @@ export function BitacorasPage() {
                 {tipoTrabajoLabels[moto.tipo_trabajo ?? "diagnostico"]}
               </span>
             </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Button type="button" className="w-full sm:w-auto" onClick={() => void deliverMoto()} disabled={delivering}>
+                <PackageCheck className="h-4 w-4" />
+                {delivering ? "Cerrando..." : "Marcar entregada"}
+              </Button>
+              <p className="text-xs leading-5 text-[#FFF2E1]/58 sm:max-w-sm">
+                Cierra el trabajo, guarda una salida en historial y quita la moto de trabajos activos.
+              </p>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[420px]">
             <div className="rounded-2xl bg-[#2F2A24] p-3">
@@ -370,7 +444,7 @@ export function BitacorasPage() {
         </div>
       </Card>
 
-      <div className="sticky top-[73px] z-10 rounded-3xl border border-white/10 bg-[#0B0B0B]/90 p-2 shadow-xl shadow-black/30 backdrop-blur">
+      <div className="rounded-3xl border border-white/10 bg-[#0B0B0B]/90 p-2 shadow-xl shadow-black/30 backdrop-blur lg:sticky lg:top-[73px] lg:z-10">
         <div className="grid grid-cols-3 gap-2">
           {tabs.map((item) => {
             const Icon = item.icon;
@@ -505,14 +579,29 @@ export function BitacorasPage() {
                     </p>
                   </div>
                   {!isAutoEntrada(movimiento) ? (
-                    <button
-                      type="button"
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-500/12 text-red-200 transition hover:bg-red-500 hover:text-white active:scale-95"
-                      onClick={() => void removeMovimiento(movimiento.id, movimiento.titulo)}
-                      aria-label="Eliminar movimiento"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 gap-2">
+                      {movimiento.publico && cliente?.telefono ? (
+                        <a
+                          href={getWhatsAppUrl()}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="grid h-10 w-10 place-items-center rounded-2xl bg-[#25D366]/15 text-[#7CFFA8] transition hover:bg-[#25D366] hover:text-[#0B0B0B] active:scale-95"
+                          aria-label="Enviar historial por WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </a>
+                      ) : null}
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          className="grid h-10 w-10 place-items-center rounded-2xl bg-red-500/12 text-red-200 transition hover:bg-red-500 hover:text-white active:scale-95"
+                          onClick={() => void removeMovimiento(movimiento.id, movimiento.titulo)}
+                          aria-label="Eliminar movimiento"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 

@@ -4,7 +4,9 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
 import { MotoForm, type MotoFormData } from "@/features/motocicletas/MotoForm";
+import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
+import { canManageWorkshop } from "@/utils/permissions";
 import { estadoOperativoLabels } from "@/utils/workflow";
 
 function DetailItem({ label, value }: { label: string; value?: string | number }) {
@@ -31,6 +33,8 @@ export function MotoCreatePage() {
 export function MotoDetailPage() {
   const { id = "" } = useParams();
   const { getMoto, getCliente, updateMoto, deleteMoto, activateMoto, deactivateMoto, ordenes, movimientos } = useWorkshopStore();
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canManageWorkshop(user);
   const moto = getMoto(id);
   const navigate = useNavigate();
 
@@ -76,7 +80,7 @@ export function MotoDetailPage() {
               {moto.activa !== false ? <PowerOff className="h-4 w-4 shrink-0" /> : <Power className="h-4 w-4 shrink-0" />}
               {moto.activa !== false ? "Inactivar" : "Activar"}
             </Button>
-            <Button type="button" variant="danger" onClick={() => void removeMoto()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button>
+            {canDelete ? <Button type="button" variant="danger" onClick={() => void removeMoto()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button> : null}
           </>
         }
       />

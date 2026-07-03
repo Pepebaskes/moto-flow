@@ -1,4 +1,5 @@
-import { CalendarDays, CircleDollarSign, Fuel, Lightbulb, ReceiptText, Search, Trash2, TrendingDown, TrendingUp, WalletCards, Wrench } from "lucide-react";
+import { jsPDF } from "jspdf";
+import { CalendarDays, CheckCircle2, CircleDollarSign, Clock3, Download, Fuel, Lightbulb, ReceiptText, Search, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -8,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { useWorkshopStore } from "@/stores/workshopStore";
 import type { GastoBalance } from "@/types/motoflow";
 import { currency } from "@/utils/format";
+import { addPdfFooter, addPdfHeader, ensurePdfSpace, pdfInfoBox } from "@/utils/pdf";
 import { includesSearch } from "@/utils/search";
 
 type BalanceTab = "resumen" | "historial";
@@ -55,7 +57,7 @@ function categoryLabel(value: GastoCategoria) {
 }
 
 export function BalancePage() {
-  const { movimientos, gastosBalance, getMoto, getCliente, addGastoBalance, deleteGastoBalance } = useWorkshopStore();
+  const { movimientos, gastosBalance, getMoto, getCliente, addGastoBalance, deleteGastoBalance, updateMovimientoPago } = useWorkshopStore();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<BalanceTab>("resumen");
   const [saving, setSaving] = useState(false);
@@ -78,7 +80,8 @@ export function BalancePage() {
         const manoObra = Number(movimiento.costo_mano_obra || 0);
         const total = Number(movimiento.costo || 0);
         const utilidad = total - refaccion;
-        return { movimiento, moto, cliente, refaccion, manoObra, total, utilidad };
+        const pagado = movimiento.pagado === true;
+        return { movimiento, moto, cliente, refaccion, manoObra, total, utilidad, pagado };
       })
       .filter((row) => row.total > 0 || row.refaccion > 0 || row.manoObra > 0)
       .sort((a, b) => new Date(b.movimiento.created_at).getTime() - new Date(a.movimiento.created_at).getTime());
@@ -113,13 +116,17 @@ export function BalancePage() {
   }, [expenseRows, query]);
 
   const totals = useMemo(() => {
-    const ingresos = incomeRows.reduce((sum, row) => sum + row.total, 0);
+    const cotizado = incomeRows.reduce((sum, row) => sum + row.total, 0);
+    const cobrado = incomeRows.filter((row) => row.pagado).reduce((sum, row) => sum + row.total, 0);
+    const pendiente = Math.max(0, cotizado - cobrado);
     const refacciones = incomeRows.reduce((sum, row) => sum + row.refaccion, 0);
     const manoObra = incomeRows.reduce((sum, row) => sum + row.manoObra, 0);
     const gastos = expenseRows.reduce((sum, row) => sum + Number(row.monto || 0), 0);
-    const utilidadBruta = ingresos - refacciones;
-    const utilidadNeta = utilidadBruta - gastos;
-    return { ingresos, refacciones, manoObra, gastos, utilidadBruta, utilidadNeta, trabajos: incomeRows.length, gastosCount: expenseRows.length };
+    const gastosFijos = expenseRows.filter((row) => row.categoria === "luz" || row.categoria === "renta").reduce((sum, row) => sum + Number(row.monto || 0), 0);
+    const utilidadEstimada = cotizado - refacciones - gastos;
+    const utilidadReal = cobrado - refacciones - gastos;
+    const trabajosPagados = incomeRows.filter((row) => row.pagado).length;
+    return { cotizado, cobrado, pendiente, refacciones, manoObra, gastos, gastosFijos, utilidadEstimada, utilidadReal, trabajos: incomeRows.length, trabajosPagados, gastosCount: expenseRows.length };
   }, [expenseRows, incomeRows]);
 
   const monthlyComparison = useMemo(() => {
@@ -128,10 +135,11 @@ export function BalancePage() {
     return months.map((month) => {
       const monthMovements = movimientos.filter((movimiento) => monthKey(movimiento.created_at) === month);
       const monthExpenses = gastosBalance.filter((gasto) => monthKey(gasto.fecha) === month);
-      const ingresos = monthMovements.reduce((sum, movimiento) => sum + Number(movimiento.costo || 0), 0);
+      const cotizado = monthMovements.reduce((sum, movimiento) => sum + Number(movimiento.costo || 0), 0);
+      const cobrado = monthMovements.filter((movimiento) => movimiento.pagado === true).reduce((sum, movimiento) => sum + Number(movimiento.costo || 0), 0);
       const refacciones = monthMovements.reduce((sum, movimiento) => sum + Number(movimiento.costo_refaccion || 0), 0);
       const gastos = monthExpenses.reduce((sum, gasto) => sum + Number(gasto.monto || 0), 0);
-      return { month, ingresos, gastos, utilidad: ingresos - refacciones - gastos };
+      return { month, cotizado, cobrado, gastos, utilidad: cobrado - refacciones - gastos };
     });
   }, [currentMonth, gastosBalance, movimientos]);
 
@@ -141,10 +149,10 @@ export function BalancePage() {
   const diff = currentMonthStats && previousMonth ? currentMonthStats.utilidad - previousMonth.utilidad : 0;
 
   const metrics = [
-    { label: "Ingresos del mes", value: currency(totals.ingresos), icon: CircleDollarSign },
-    { label: "Refacciones", value: currency(totals.refacciones), icon: Wrench },
-    { label: "Gastos del taller", value: currency(totals.gastos), icon: WalletCards },
-    { label: "Utilidad neta", value: currency(totals.utilidadNeta), icon: totals.utilidadNeta >= 0 ? TrendingUp : TrendingDown },
+    { label: "Cotizado del mes", value: currency(totals.cotizado), icon: CircleDollarSign },
+    { label: "Cobrado real", value: currency(totals.cobrado), icon: CheckCircle2 },
+    { label: "Pendiente de cobrar", value: currency(totals.pendiente), icon: Clock3 },
+    { label: "Utilidad real", value: currency(totals.utilidadReal), icon: totals.utilidadReal >= 0 ? TrendingUp : TrendingDown },
   ];
 
   async function submitExpense(event: FormEvent<HTMLFormElement>) {
@@ -174,9 +182,112 @@ export function BalancePage() {
     await deleteGastoBalance(id);
   }
 
+  async function togglePayment(id: string, pagado: boolean) {
+    await updateMovimientoPago(id, { pagado, metodo_pago: "efectivo" });
+  }
+
+  function exportBalancePdf() {
+    const doc = new jsPDF();
+    let y = addPdfHeader(doc, "Balance mensual", `Periodo: ${monthLabel(currentMonth)}`);
+
+    pdfInfoBox(doc, "Cotizado", currency(totals.cotizado), 14, y, 43);
+    pdfInfoBox(doc, "Cobrado real", currency(totals.cobrado), 61, y, 43);
+    pdfInfoBox(doc, "Pendiente", currency(totals.pendiente), 108, y, 43);
+    pdfInfoBox(doc, "Utilidad real", currency(totals.utilidadReal), 155, y, 41);
+    y += 30;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Resumen de cuentas", 14, y);
+    y += 8;
+
+    const summary = [
+      ["Refacciones", currency(totals.refacciones)],
+      ["Mano de obra registrada", currency(totals.manoObra)],
+      ["Gastos del taller", currency(totals.gastos)],
+      ["Gastos fijos (luz/renta)", currency(totals.gastosFijos)],
+      ["Utilidad estimada", currency(totals.utilidadEstimada)],
+      ["Trabajos pagados", `${totals.trabajosPagados}/${totals.trabajos}`],
+    ];
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    summary.forEach(([label, value]) => {
+      doc.setTextColor(95, 95, 95);
+      doc.text(label, 18, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 30);
+      doc.text(value, 118, y);
+      doc.setFont("helvetica", "normal");
+      y += 6;
+    });
+
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Trabajos del mes", 14, y);
+    y += 8;
+
+    doc.setFontSize(8);
+    incomeRows.slice(0, 28).forEach((row) => {
+      y = ensurePdfSpace(doc, y, 15);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 30);
+      doc.text(doc.splitTextToSize(row.movimiento.titulo, 80), 14, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(95, 95, 95);
+      doc.text(`${row.cliente?.nombre ?? "Sin cliente"} | ${row.moto ? `${row.moto.marca} ${row.moto.modelo}` : "Sin moto"}`, 14, y + 5);
+      doc.text(row.pagado ? "Pagado" : "Pendiente", 112, y);
+      doc.text(currency(row.refaccion), 138, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 30);
+      doc.text(currency(row.total), 170, y);
+      y += 13;
+    });
+
+    if (incomeRows.length > 28) {
+      y = ensurePdfSpace(doc, y, 8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(95, 95, 95);
+      doc.text(`Se omitieron ${incomeRows.length - 28} trabajos por espacio. Exporta CSV para respaldo completo.`, 14, y);
+      y += 8;
+    }
+
+    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Gastos manuales", 14, y);
+    y += 8;
+
+    doc.setFontSize(8);
+    expenseRows.slice(0, 22).forEach((gasto) => {
+      y = ensurePdfSpace(doc, y, 10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 30);
+      doc.text(gasto.concepto, 14, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(95, 95, 95);
+      doc.text(`${shortDate(gasto.fecha)} | ${categoryLabel(gasto.categoria)}`, 90, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 30);
+      doc.text(currency(Number(gasto.monto || 0)), 170, y);
+      y += 7;
+    });
+
+    addPdfFooter(doc);
+    doc.save(`balance-taller-villa-${currentMonth}.pdf`);
+  }
+
   return (
     <div className="min-w-0 space-y-5">
-      <PageHeader title="Balance" subtitle="Ingresos, refacciones y gastos manuales para saber como va el taller cada mes." />
+      <PageHeader
+        title="Balance"
+        subtitle="Cotizado, cobrado, pendiente y gastos del taller para que las cuentas cierren bien."
+        actions={<Button type="button" variant="secondary" onClick={exportBalancePdf}><Download className="h-4 w-4" /> PDF del mes</Button>}
+      />
 
       <Card>
         <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-center">
@@ -222,7 +333,7 @@ export function BalancePage() {
             <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#FFF2E1]/55">Comparacion mensual</p>
-                <h2 className="text-2xl font-semibold text-white">Utilidad neta</h2>
+                <h2 className="text-2xl font-semibold text-white">Utilidad real</h2>
               </div>
               <p className={`text-sm font-semibold ${diff >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                 {previousMonth ? `${diff >= 0 ? "Mejor" : "Peor"} que el mes anterior: ${currency(Math.abs(diff))}` : "Aun no hay mes anterior"}
@@ -282,18 +393,22 @@ export function BalancePage() {
           </Card>
 
           <Card className="xl:col-span-2">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-[#FFF2E1]/58">Trabajos cobrados</p>
-                <p className="mt-2 text-2xl font-semibold text-white">{totals.trabajos}</p>
+                <p className="text-sm text-[#FFF2E1]/58">Trabajos pagados</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{totals.trabajosPagados}/{totals.trabajos}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-[#FFF2E1]/58">Gastos capturados</p>
-                <p className="mt-2 text-2xl font-semibold text-white">{totals.gastosCount}</p>
+                <p className="text-sm text-[#FFF2E1]/58">Gastos fijos</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{currency(totals.gastosFijos)}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-[#FFF2E1]/58">Utilidad bruta</p>
-                <p className="mt-2 text-2xl font-semibold text-white">{currency(totals.utilidadBruta)}</p>
+                <p className="text-sm text-[#FFF2E1]/58">Utilidad estimada</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{currency(totals.utilidadEstimada)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-sm text-[#FFF2E1]/58">Refacciones</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{currency(totals.refacciones)}</p>
               </div>
             </div>
           </Card>
@@ -324,19 +439,28 @@ export function BalancePage() {
 
           <Card className="p-0">
             <div className="border-b border-white/10 px-4 py-3">
-              <h2 className="text-lg font-semibold text-white">Ingresos desde trabajos</h2>
+              <h2 className="text-lg font-semibold text-white">Trabajos y cobros</h2>
               <p className="text-sm text-[#FFF2E1]/55">{filteredIncomeRows.length} registros</p>
             </div>
             <div className="divide-y divide-white/10">
               {filteredIncomeRows.map((row) => (
-                <article key={row.movimiento.id} className="grid gap-3 p-4 transition hover:bg-white/[0.04] sm:grid-cols-[96px_minmax(0,1fr)_120px] sm:items-center">
+                <article key={row.movimiento.id} className="grid gap-3 p-4 transition hover:bg-white/[0.04] lg:grid-cols-[96px_minmax(0,1fr)_120px_150px] lg:items-center">
                   <p className="text-sm font-semibold text-[#FFF2E1]/72">{formatDate(row.movimiento.created_at)}</p>
                   <div className="min-w-0">
                     <p className="break-words font-semibold text-white">{row.movimiento.titulo}</p>
                     <p className="truncate text-sm text-[#FFF2E1]/58">{row.cliente?.nombre ?? "Sin cliente"} | {row.moto ? `${row.moto.marca} ${row.moto.modelo} ${row.moto.placas}` : "Sin moto"}</p>
                     {row.movimiento.refaccion ? <p className="truncate text-xs text-[#FFD08A]">{row.movimiento.refaccion}</p> : null}
+                    <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.pagado ? "bg-emerald-400/15 text-emerald-200" : "bg-[#FFD08A]/12 text-[#FFD08A]"}`}>
+                      {row.pagado ? "Pagado" : "Pendiente de cobro"}
+                    </span>
                   </div>
-                  <p className="font-semibold text-[#FFD08A]">{currency(row.total)}</p>
+                  <div>
+                    <p className="font-semibold text-[#FFD08A]">{currency(row.total)}</p>
+                    <p className="text-xs text-[#FFF2E1]/48">Ref. {currency(row.refaccion)} | M.O. {currency(row.manoObra)}</p>
+                  </div>
+                  <Button variant={row.pagado ? "secondary" : "primary"} className="w-full" onClick={() => void togglePayment(row.movimiento.id, !row.pagado)}>
+                    {row.pagado ? "Marcar pendiente" : "Marcar pagado"}
+                  </Button>
                 </article>
               ))}
             </div>
@@ -355,7 +479,7 @@ export function BalancePage() {
         <Card>
           <div className="flex items-center gap-3">
             <Lightbulb className="h-5 w-5 text-[#FFD08A]" />
-            <p className="text-sm text-[#FFF2E1]/65">Luz/renta: <span className="font-semibold text-white">{currency(expenseRows.filter((gasto) => gasto.categoria === "luz" || gasto.categoria === "renta").reduce((sum, gasto) => sum + Number(gasto.monto || 0), 0))}</span></p>
+            <p className="text-sm text-[#FFF2E1]/65">Luz/renta: <span className="font-semibold text-white">{currency(totals.gastosFijos)}</span></p>
           </div>
         </Card>
         <Card>

@@ -111,6 +111,9 @@ export type MovimientoOrden = BaseEntity & {
   costo_refaccion?: number;
   costo_mano_obra?: number;
   kilometraje?: number;
+  pagado?: boolean;
+  pagado_at?: string;
+  metodo_pago?: "efectivo" | "transferencia" | "tarjeta" | "otro";
 };
 
 export type CotizacionItem = {

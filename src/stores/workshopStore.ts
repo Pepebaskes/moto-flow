@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { mockData } from "@/lib/mockData";
-import { notifyOrderStatusChange, notifyWorkUpdate } from "@/lib/notifications";
+import { notifyOrderStatusChange } from "@/lib/notifications";
 import { allowLocalMode, hasSupabaseCredentials, storageBucket, supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore";
 import type { Cliente, Cotizacion, EstadoOperativo, EstadoOrden, Evidencia, GastoBalance, Motocicleta, MovimientoOrden, NotificacionCliente, OrdenTrabajo, PrioridadTrabajo, TamanoTrabajo, TipoEvidencia, TipoTrabajo, WorkshopState } from "@/types/motoflow";
 import { createPublicCode, uid } from "@/utils/format";
+import { canManageWorkshop, workshopManagerOnlyMessage } from "@/utils/permissions";
 
 type NewCliente = Omit<Cliente, "id" | "taller_id" | "created_at" | "updated_at">;
 type NewMoto = Omit<Motocicleta, "id" | "taller_id" | "created_at" | "updated_at">;
@@ -17,6 +19,7 @@ type NewCotizacion = Omit<Cotizacion, "id" | "taller_id" | "created_at" | "updat
   estado?: Cotizacion["estado"];
 };
 type NewGastoBalance = Omit<GastoBalance, "id" | "taller_id" | "created_at" | "updated_at">;
+type MovimientoPago = Pick<MovimientoOrden, "pagado" | "metodo_pago">;
 
 type Store = WorkshopState & {
   usingSupabase: boolean;
@@ -57,6 +60,7 @@ type Store = WorkshopState & {
     estado_nuevo?: EstadoOrden;
     ciclo_trabajo_id?: string;
   }) => Promise<MovimientoOrden | undefined>;
+  updateMovimientoPago: (id: string, data: MovimientoPago) => Promise<void>;
   deleteMovimiento: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   addEvidence: (data: { orden_id?: string; moto_id?: string; movimiento_id?: string; tipo: TipoEvidencia; nota?: string; publico?: boolean; file: File }) => Promise<void>;
   getCliente: (id: string) => Cliente | undefined;
@@ -79,6 +83,14 @@ function withBase<T extends object>(prefix: string, data: T, taller_id = localTa
     created_at: at,
     updated_at: at,
   };
+}
+
+function currentUserCanManageWorkshop() {
+  return canManageWorkshop(useAuthStore.getState().user);
+}
+
+function workshopManagerOnlyResult() {
+  return { ok: false as const, message: workshopManagerOnlyMessage };
 }
 
 function motoEntradaText(moto: Pick<Motocicleta, "marca" | "modelo" | "anio" | "placas" | "color" | "kilometraje" | "numero_serie">) {
@@ -215,6 +227,7 @@ export const useWorkshopStore = create<Store>()(
       },
 
       deleteCliente: async (id) => {
+        if (!currentUserCanManageWorkshop()) return workshopManagerOnlyResult();
         const motosCliente = get().motocicletas.filter((moto) => moto.cliente_id === id);
         if (motosCliente.length > 0) {
           return { ok: false, message: "No puedes eliminar un cliente con motocicletas registradas. Elimina o reasigna sus motos primero." };
@@ -371,6 +384,7 @@ export const useWorkshopStore = create<Store>()(
       },
 
       deleteMoto: async (id) => {
+        if (!currentUserCanManageWorkshop()) return workshopManagerOnlyResult();
         const movimientosMoto = get().movimientos.filter((movimiento) => movimiento.moto_id === id);
         const cotizacionesMoto = get().cotizaciones.filter((cotizacion) => cotizacion.moto_id === id);
         if (movimientosMoto.length > 0 || cotizacionesMoto.length > 0) {
@@ -438,12 +452,14 @@ export const useWorkshopStore = create<Store>()(
       },
 
       deleteCotizacion: async (id) => {
+        if (!currentUserCanManageWorkshop()) return workshopManagerOnlyResult();
         if (supabase) await deleteRow("cotizaciones", id);
         set((state) => ({ cotizaciones: state.cotizaciones.filter((cotizacion) => cotizacion.id !== id) }));
         return { ok: true };
       },
 
       addGastoBalance: async (data) => {
+        if (!currentUserCanManageWorkshop()) throw new Error(workshopManagerOnlyMessage);
         const payload = {
           ...data,
           concepto: data.concepto.trim(),
@@ -464,6 +480,7 @@ export const useWorkshopStore = create<Store>()(
       },
 
       deleteGastoBalance: async (id) => {
+        if (!currentUserCanManageWorkshop()) return workshopManagerOnlyResult();
         if (supabase) await deleteRow("balance_gastos", id);
         set((state) => ({ gastosBalance: state.gastosBalance.filter((gasto) => gasto.id !== id) }));
         return { ok: true };
@@ -568,7 +585,6 @@ export const useWorkshopStore = create<Store>()(
 
       addMovimiento: async (data) => {
         const moto = data.moto_id ? get().motocicletas.find((item) => item.id === data.moto_id) : undefined;
-        const orden = data.orden_id ? get().ordenes.find((item) => item.id === data.orden_id) : undefined;
         const costo_refaccion = Number(data.costo_refaccion || 0);
         const costo_mano_obra = Number(data.costo_mano_obra || 0);
         const costo = Number(data.costo || 0) || costo_refaccion + costo_mano_obra;
@@ -588,32 +604,36 @@ export const useWorkshopStore = create<Store>()(
             taller_id,
             ...payload,
           });
-          if (movimiento) {
-            set((state) => ({ movimientos: [movimiento, ...state.movimientos], tallerId: taller_id }));
-            if (movimiento.publico) {
-              const motoNotificada = moto ?? (orden?.moto_id ? get().getMoto(orden.moto_id) : undefined);
-              const cliente = motoNotificada ? get().getCliente(motoNotificada.cliente_id) : orden ? get().getCliente(orden.cliente_id) : undefined;
-              const notification = await notifyWorkUpdate({ tallerId: taller_id, cliente, moto: motoNotificada, movimiento });
-              if (notification.ok) {
-                const notificaciones = await selectTable<NotificacionCliente>("notificaciones_cliente").catch(() => get().notificaciones);
-                set({ notificaciones });
-              }
-            }
-          }
+          if (movimiento) set((state) => ({ movimientos: [movimiento, ...state.movimientos], tallerId: taller_id }));
           return movimiento ?? undefined;
         }
 
         const movimiento = withBase("mov", payload);
         set((state) => ({ movimientos: [movimiento, ...state.movimientos] }));
-        if (movimiento.publico) {
-          const motoNotificada = moto ?? (orden?.moto_id ? get().getMoto(orden.moto_id) : undefined);
-          const cliente = motoNotificada ? get().getCliente(motoNotificada.cliente_id) : orden ? get().getCliente(orden.cliente_id) : undefined;
-          await notifyWorkUpdate({ tallerId: get().tallerId, cliente, moto: motoNotificada, movimiento });
-        }
         return movimiento;
       },
 
+      updateMovimientoPago: async (id, data) => {
+        if (!currentUserCanManageWorkshop()) throw new Error(workshopManagerOnlyMessage);
+        const payload = {
+          pagado: Boolean(data.pagado),
+          pagado_at: data.pagado ? stamp() : null,
+          metodo_pago: data.pagado ? data.metodo_pago || "efectivo" : null,
+        };
+
+        if (supabase) {
+          const movimiento = await updateRow<MovimientoOrden>("movimientos_orden", id, payload);
+          if (movimiento) set((state) => ({ movimientos: state.movimientos.map((item) => (item.id === id ? movimiento : item)) }));
+          return;
+        }
+
+        set((state) => ({
+          movimientos: state.movimientos.map((movimiento) => (movimiento.id === id ? { ...movimiento, ...payload, updated_at: stamp() } : movimiento)),
+        }));
+      },
+
       deleteMovimiento: async (id) => {
+        if (!currentUserCanManageWorkshop()) return workshopManagerOnlyResult();
         const movimiento = get().movimientos.find((item) => item.id === id);
         if (!movimiento) return { ok: false, message: "No encontramos ese movimiento." };
         if (movimiento.tipo === "entrada" && movimiento.titulo.toLowerCase().includes("recibida dentro del taller")) {

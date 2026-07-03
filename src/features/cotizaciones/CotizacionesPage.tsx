@@ -7,9 +7,12 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
+import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
 import type { Cotizacion, CotizacionItem } from "@/types/motoflow";
 import { currency, uid } from "@/utils/format";
+import { addPdfFooter, addPdfHeader, ensurePdfSpace, pdfInfoBox } from "@/utils/pdf";
+import { canManageWorkshop } from "@/utils/permissions";
 import { includesSearch, isWithinDateFilter } from "@/utils/search";
 
 const CLAUSULA_DEFAULT =
@@ -22,41 +25,42 @@ function totalCotizacion(items: CotizacionItem[]) {
 function downloadCotizacionPdf(cotizacion: Cotizacion, cliente: string, moto?: string) {
   const doc = new jsPDF();
   const total = totalCotizacion(cotizacion.items);
-  let y = 18;
+  let y = addPdfHeader(doc, "Cotizacion de servicio", `Folio: ${cotizacion.folio} | Fecha: ${cotizacion.fecha}`);
+
+  pdfInfoBox(doc, "Cliente", cliente, 14, y, 56);
+  pdfInfoBox(doc, "Motocicleta", moto || "No especificada", 76, y, 56);
+  pdfInfoBox(doc, "Total estimado", currency(total), 138, y, 58);
+  y += 30;
+
+  if (cotizacion.domicilio) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text(`Domicilio: ${cotizacion.domicilio}`, 14, y);
+    y += 8;
+  }
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("Taller Villa - Cotizacion", 14, y);
-  y += 10;
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Folio: ${cotizacion.folio}`, 14, y);
-  doc.text(`Fecha: ${cotizacion.fecha}`, 145, y);
-  y += 7;
-  doc.text(`Cliente: ${cliente}`, 14, y);
-  y += 7;
-  doc.text(`Moto: ${moto || "No especificada"}`, 14, y);
-  y += 7;
-  doc.text(`Domicilio: ${cotizacion.domicilio || "No especificado"}`, 14, y);
-  y += 10;
-
-  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 30, 30);
+  doc.setFontSize(13);
   doc.text(cotizacion.titulo, 14, y);
   y += 8;
 
+  doc.setFillColor(47, 42, 36);
+  doc.roundedRect(14, y, 182, 8, 2, 2, "F");
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(9);
-  doc.text("Concepto", 14, y);
-  doc.text("Cant.", 112, y);
-  doc.text("Precio", 132, y);
-  doc.text("Importe", 165, y);
-  y += 5;
-  doc.line(14, y, 196, y);
-  y += 6;
+  doc.text("Concepto", 18, y + 5);
+  doc.text("Cant.", 112, y + 5);
+  doc.text("Precio", 132, y + 5);
+  doc.text("Importe", 165, y + 5);
+  y += 14;
 
   doc.setFont("helvetica", "normal");
   cotizacion.items.forEach((item) => {
+    y = ensurePdfSpace(doc, y, 18);
     const conceptoLines = doc.splitTextToSize(item.concepto, 88);
+    doc.setTextColor(30, 30, 30);
     doc.text(conceptoLines, 14, y);
     doc.text(String(item.cantidad), 114, y);
     doc.text(currency(item.precio_unitario), 132, y);
@@ -74,6 +78,7 @@ function downloadCotizacionPdf(cotizacion: Cotizacion, cliente: string, moto?: s
   doc.line(120, y, 196, y);
   y += 7;
   doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 30, 30);
   doc.text(`Total estimado: ${currency(total)}`, 132, y);
   y += 12;
 
@@ -89,19 +94,25 @@ function downloadCotizacionPdf(cotizacion: Cotizacion, cliente: string, moto?: s
   }
 
   doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 30, 30);
   doc.text("Clausula de variacion del presupuesto", 14, y);
   y += 5;
   doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
   doc.text(doc.splitTextToSize(cotizacion.clausula, 180), 14, y);
   y += 20;
 
   doc.setFontSize(8);
+  doc.setTextColor(90, 90, 90);
   doc.text("La autorizacion del cliente es necesaria para cualquier cambio de alcance o incremento de costo.", 14, y);
+  addPdfFooter(doc);
   doc.save(`${cotizacion.folio}-${cliente.replaceAll(" ", "-")}.pdf`);
 }
 
 export function CotizacionesPage() {
   const { clientes, motocicletas, cotizaciones, addCotizacion, deleteCotizacion, getCliente, getMoto } = useWorkshopStore();
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canManageWorkshop(user);
   const [clienteId, setClienteId] = useState(clientes[0]?.id ?? "");
   const [items, setItems] = useState<CotizacionItem[]>([
     { id: uid("item"), concepto: "Servicio o refaccion", cantidad: 1, precio_unitario: 0, proveedor: "" },
@@ -343,9 +354,11 @@ export function CotizacionesPage() {
                     <Button className="w-full lg:w-auto" variant="secondary" onClick={() => downloadCotizacionPdf(cotizacion, cliente?.nombre ?? "Cliente", motoLabel)}>
                       <Download className="h-4 w-4" /> PDF
                     </Button>
-                    <Button className="w-full lg:w-auto" variant="danger" onClick={() => void removeCotizacion(cotizacion.id, cotizacion.folio)}>
-                      <Trash2 className="h-4 w-4" /> Eliminar
-                    </Button>
+                    {canDelete ? (
+                      <Button className="w-full lg:w-auto" variant="danger" onClick={() => void removeCotizacion(cotizacion.id, cotizacion.folio)}>
+                        <Trash2 className="h-4 w-4" /> Eliminar
+                      </Button>
+                    ) : null}
                   </div>
                 </article>
               );

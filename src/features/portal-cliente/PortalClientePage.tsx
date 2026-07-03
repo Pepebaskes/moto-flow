@@ -125,7 +125,7 @@ export function PortalClientePage() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#FFF2E1] px-3 py-4 text-[#0B0B0B] sm:px-5 sm:py-8">
+    <div className="min-h-dvh w-full overflow-x-hidden bg-[#FFF2E1] px-3 py-4 pb-12 text-[#0B0B0B] sm:px-5 sm:py-8">
       <main className="mx-auto w-full max-w-2xl min-w-0">
         <div className="mb-4 min-w-0 rounded-3xl bg-[#0B0B0B] p-5 text-white shadow-xl shadow-[#2F2A24]/25">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F2B705]">Taller Villa</p>

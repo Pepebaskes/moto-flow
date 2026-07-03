@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
+import { Card } from "@/components/Card";
 import { BitacorasPage } from "@/features/bitacoras/BitacorasPage";
 import { BalancePage } from "@/features/balance/BalancePage";
 import { ClienteCreatePage, ClienteDetailPage } from "@/features/clientes/ClienteDetailPage";
@@ -10,6 +11,22 @@ import { HistorialPage } from "@/features/historial/HistorialPage";
 import { MotoCreatePage, MotoDetailPage } from "@/features/motocicletas/MotoDetailPage";
 import { MotocicletasPage } from "@/features/motocicletas/MotocicletasPage";
 import { PortalClientePage } from "@/features/portal-cliente/PortalClientePage";
+import { useAuthStore } from "@/stores/authStore";
+import { canManageWorkshop } from "@/utils/permissions";
+
+function WorkshopManagerOnly({ children }: { children: JSX.Element }) {
+  const user = useAuthStore((state) => state.user);
+  if (canManageWorkshop(user)) return children;
+
+  return (
+    <Card>
+      <h1 className="text-xl font-semibold text-white">Acceso de mecanico principal</h1>
+      <p className="mt-2 text-sm text-[#FFF2E1]/65">
+        Balance queda reservado para el admin o mecanico principal del taller.
+      </p>
+    </Card>
+  );
+}
 
 function PrivateRoutes() {
   return (
@@ -28,7 +45,7 @@ function PrivateRoutes() {
         <Route path="/bitacoras" element={<BitacorasPage />} />
         <Route path="/historial" element={<HistorialPage />} />
         <Route path="/cotizaciones" element={<CotizacionesPage />} />
-        <Route path="/balance" element={<BalancePage />} />
+        <Route path="/balance" element={<WorkshopManagerOnly><BalancePage /></WorkshopManagerOnly>} />
         <Route path="/kanban" element={<Navigate to="/bitacoras" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

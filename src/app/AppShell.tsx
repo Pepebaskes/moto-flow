@@ -5,6 +5,7 @@ import { AuthPage } from "@/features/auth/AuthPage";
 import { hasSupabaseCredentials, supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
+import { canManageWorkshop, roleLabel } from "@/utils/permissions";
 
 const nav = [
   { to: "/", label: "Inicio", icon: Home },
@@ -13,7 +14,7 @@ const nav = [
   { to: "/bitacoras", label: "Trabajos", icon: BookOpen },
   { to: "/historial", label: "Historial", icon: FileClock },
   { to: "/cotizaciones", label: "Cotizaciones", icon: FileText },
-  { to: "/balance", label: "Balance", icon: PieChart },
+  { to: "/balance", label: "Balance", icon: PieChart, managerOnly: true },
 ];
 
 function Brand() {
@@ -52,11 +53,14 @@ function NavItem({ item, onClick }: { item: (typeof nav)[number]; onClick?: () =
 }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const user = useAuthStore((state) => state.user);
+  const visibleNav = nav.filter((item) => !item.managerOnly || canManageWorkshop(user));
+
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-[#0B0B0B] px-4 py-5 text-white">
       <Brand />
       <nav className="mt-8 space-y-2">
-        {nav.map((item) => (
+        {visibleNav.map((item) => (
           <NavItem key={item.to} item={item} onClick={onNavigate} />
         ))}
       </nav>
@@ -106,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!user) return <AuthPage />;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#0B0B0B] text-[#FFF2E1]">
+    <div className="min-h-dvh overflow-x-hidden bg-[#0B0B0B] text-[#FFF2E1]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 lg:block">
         <Sidebar />
       </aside>
@@ -136,7 +140,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ) : null}
 
       <div className="w-full min-w-0 max-w-full lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0B0B0B]/85 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+        <header className="border-b border-white/10 bg-[#0B0B0B]/85 px-4 py-3 backdrop-blur-xl sm:px-6 lg:sticky lg:top-0 lg:z-20 lg:px-8">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <button
@@ -157,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {usingSupabase ? (hasSession ? "Supabase activo" : "Supabase conectado") : "Modo local"}
               </span>
               <span className="max-w-[88px] truncate rounded-full bg-[#F2B705]/10 px-2.5 py-1 text-xs font-semibold text-[#FFF2E1] min-[380px]:max-w-[140px] sm:max-w-none sm:px-3">
-                {user.name}
+                {user.name} | {roleLabel(user)}
               </span>
               <button
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/8 text-[#FFF2E1]/75 transition hover:bg-red-500 hover:text-white active:scale-95"
@@ -173,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {error ? <p className="mt-2 rounded-2xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200">{error}</p> : null}
         </header>
 
-        <main className="mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 py-5 sm:px-6 lg:px-8">{children}</main>
+        <main className="mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pb-24 pt-5 sm:px-6 sm:pb-8 lg:px-8">{children}</main>
       </div>
     </div>
   );

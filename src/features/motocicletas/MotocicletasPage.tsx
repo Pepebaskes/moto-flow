@@ -1,4 +1,4 @@
-import { Eye, Power, PowerOff, Search, Trash2 } from "lucide-react";
+import { Download, Eye, Power, PowerOff, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/Button";
@@ -6,12 +6,17 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Input, Select } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
+import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
+import { downloadCsv } from "@/utils/csv";
+import { canManageWorkshop } from "@/utils/permissions";
 import { includesSearch, isWithinDateFilter, normalizeSearch } from "@/utils/search";
 import { estadoOperativoLabels } from "@/utils/workflow";
 
 export function MotocicletasPage() {
   const { motocicletas, getCliente, deleteMoto, activateMoto, deactivateMoto } = useWorkshopStore();
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canManageWorkshop(user);
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -62,9 +67,45 @@ export function MotocicletasPage() {
       });
   }, [brandFilter, dateFilter, getCliente, motocicletas, query, statusFilter]);
 
+  function exportMotosCsv() {
+    downloadCsv(
+      `motocicletas-taller-villa-${new Date().toISOString().slice(0, 10)}.csv`,
+      filteredMotos.map((moto) => {
+        const cliente = getCliente(moto.cliente_id);
+        return {
+          cliente: cliente?.nombre ?? "",
+          telefono: cliente?.telefono ?? "",
+          marca: moto.marca,
+          modelo: moto.modelo,
+          anio: moto.anio,
+          placas: moto.placas,
+          color: moto.color,
+          kilometraje: moto.kilometraje,
+          numero_serie: moto.numero_serie || "",
+          estado: moto.activa !== false ? "activa" : "inactiva",
+          trabajo: moto.estado_operativo ?? "",
+          registrada: new Date(moto.created_at).toLocaleString("es-MX"),
+        };
+      }),
+    );
+  }
+
   return (
     <div className="min-w-0">
-      <PageHeader title="Motocicletas" subtitle="Expediente de unidades. Activa una moto solo cuando tenga trabajo en el taller." actions={<Link to="/motocicletas/nueva"><Button>Nueva moto</Button></Link>} />
+      <PageHeader
+        title="Motocicletas"
+        subtitle="Expediente de unidades. Activa una moto solo cuando tenga trabajo en el taller."
+        actions={
+          <>
+            {canDelete && motocicletas.length > 0 ? (
+              <Button type="button" variant="secondary" onClick={exportMotosCsv}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+            ) : null}
+            <Link to="/motocicletas/nueva"><Button>Nueva moto</Button></Link>
+          </>
+        }
+      />
       {motocicletas.length === 0 ? <EmptyState title="Aun no hay motocicletas" /> : null}
 
       {motocicletas.length > 0 ? (
@@ -147,9 +188,11 @@ export function MotocicletasPage() {
                       {active ? <PowerOff className="h-4 w-4 shrink-0" /> : <Power className="h-4 w-4 shrink-0" />}
                       {active ? "Inactivar" : "Activar"}
                     </Button>
-                    <Button type="button" variant="danger" className="w-full lg:w-auto" onClick={() => void removeMoto(moto.id, `${moto.marca} ${moto.modelo}`)}>
-                      <Trash2 className="h-4 w-4 shrink-0" /> Eliminar
-                    </Button>
+                    {canDelete ? (
+                      <Button type="button" variant="danger" className="w-full lg:w-auto" onClick={() => void removeMoto(moto.id, `${moto.marca} ${moto.modelo}`)}>
+                        <Trash2 className="h-4 w-4 shrink-0" /> Eliminar
+                      </Button>
+                    ) : null}
                   </div>
                 </article>
               );

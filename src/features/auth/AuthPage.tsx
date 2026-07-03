@@ -34,8 +34,8 @@ export function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#0B0B0B] px-4 py-5 text-white sm:px-6">
-      <main className="mx-auto grid min-h-[calc(100vh-2.5rem)] w-full max-w-6xl items-center">
+    <div className="min-h-dvh overflow-x-hidden bg-[#0B0B0B] px-4 py-5 text-white sm:px-6">
+      <main className="mx-auto grid min-h-[calc(100dvh-2.5rem)] w-full max-w-6xl items-center">
         <section className="grid overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#151515] shadow-2xl shadow-black/60 lg:grid-cols-[430px_1fr]">
           <div className="order-2 p-5 sm:p-8 lg:order-1 lg:p-10">
             <div className="mb-8">

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { allowLocalMode, hasSupabaseCredentials, supabase } from "@/lib/supabase";
 
-export type StaffRole = "admin" | "mecanico";
+export type StaffRole = "admin" | "mecanico" | "chalan";
 
 export type StaffUser = {
   username: string;
@@ -11,11 +11,10 @@ export type StaffUser = {
 };
 
 const demoUsers: Record<string, StaffUser & { passwords: string[] }> = {
-  admin: { username: "admin", passwords: ["123"], name: "Administrador", role: "admin" },
-  mecanico: { username: "mecanico", passwords: ["123"], name: "Mecanico", role: "mecanico" },
-  "3411674336": { username: "3411674336", passwords: ["contrase\u00f1a123", "contrasena123", "123"], name: "Rogelio Villa", role: "mecanico" },
-  pepebaskes: { username: "pepebaskes", passwords: ["Rafael388?", "123"], name: "pepebaskes", role: "admin" },
-  "rafaelvazquezsilva8@outlook.com": { username: "rafaelvazquezsilva8@outlook.com", passwords: ["Rafael388?", "123"], name: "pepebaskes", role: "admin" },
+  "3411674336": { username: "3411674336", passwords: ["contrase\u00f1a123", "contrasena123"], name: "Rogelio Villa", role: "mecanico" },
+  chalan: { username: "chalan", passwords: ["chalan123"], name: "Chalan de taller", role: "chalan" },
+  pepebaskes: { username: "pepebaskes", passwords: ["Rafael388?"], name: "pepebaskes", role: "admin" },
+  "rafaelvazquezsilva8@outlook.com": { username: "rafaelvazquezsilva8@outlook.com", passwords: ["Rafael388?"], name: "pepebaskes", role: "admin" },
 };
 
 type LoginResult = { ok: true } | { ok: false; message: string };
@@ -83,11 +82,13 @@ export const useAuthStore = create<AuthStore>()(
           .eq("user_id", data.user.id)
           .maybeSingle();
 
+        const rol = perfil?.rol === "admin" || perfil?.rol === "mecanico" || perfil?.rol === "chalan" ? perfil.rol : "chalan";
+
         set({
           user: {
             username: identifier,
             name: perfil?.nombre ?? data.user.user_metadata?.name ?? identifier,
-            role: perfil?.rol === "admin" ? "admin" : "mecanico",
+            role: rol,
           },
         });
         return { ok: true };

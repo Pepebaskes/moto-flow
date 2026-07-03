@@ -136,6 +136,9 @@ create table if not exists public.movimientos_orden (
   costo_refaccion numeric(12,2),
   costo_mano_obra numeric(12,2),
   kilometraje int,
+  pagado boolean not null default false,
+  pagado_at timestamptz,
+  metodo_pago text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -205,6 +208,9 @@ create index if not exists idx_balance_gastos_taller_id on public.balance_gastos
 create index if not exists idx_balance_gastos_categoria on public.balance_gastos(categoria);
 create index if not exists idx_balance_gastos_fecha on public.balance_gastos(fecha);
 create index if not exists idx_balance_gastos_created_at on public.balance_gastos(created_at);
+create index if not exists idx_movimientos_orden_pagado on public.movimientos_orden(pagado);
+create index if not exists idx_movimientos_orden_pagado_at on public.movimientos_orden(pagado_at);
+create index if not exists idx_movimientos_orden_metodo_pago on public.movimientos_orden(metodo_pago);
 
 do $$ begin
   alter table public.notificaciones_cliente
@@ -235,6 +241,13 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 
+do $$ begin
+  alter table public.movimientos_orden
+  add constraint movimientos_orden_metodo_pago_check
+  check (metodo_pago is null or metodo_pago in ('efectivo', 'transferencia', 'tarjeta', 'otro'));
+exception when duplicate_object then null;
+end $$;
+
 alter table public.movimientos_orden add column if not exists tipo text not null default 'avance';
 alter table public.clientes add column if not exists acepta_notificaciones boolean not null default true;
 alter table public.ordenes_trabajo add column if not exists ultima_notificacion_estado text;
@@ -252,6 +265,9 @@ alter table public.movimientos_orden add column if not exists refaccion text;
 alter table public.movimientos_orden add column if not exists costo_refaccion numeric(12,2);
 alter table public.movimientos_orden add column if not exists costo_mano_obra numeric(12,2);
 alter table public.movimientos_orden add column if not exists kilometraje int;
+alter table public.movimientos_orden add column if not exists pagado boolean not null default false;
+alter table public.movimientos_orden add column if not exists pagado_at timestamptz;
+alter table public.movimientos_orden add column if not exists metodo_pago text;
 alter table public.motocicletas add column if not exists fecha_estimada_salida date;
 alter table public.motocicletas add column if not exists activa boolean not null default true;
 alter table public.motocicletas add column if not exists ciclo_trabajo_id text;

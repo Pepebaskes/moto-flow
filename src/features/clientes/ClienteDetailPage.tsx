@@ -4,7 +4,9 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
 import { ClienteForm, type ClienteFormData } from "@/features/clientes/ClienteForm";
+import { useAuthStore } from "@/stores/authStore";
 import { useWorkshopStore } from "@/stores/workshopStore";
+import { canManageWorkshop } from "@/utils/permissions";
 
 export function ClienteCreatePage() {
   const addCliente = useWorkshopStore((state) => state.addCliente);
@@ -19,6 +21,8 @@ export function ClienteCreatePage() {
 export function ClienteDetailPage() {
   const { id = "" } = useParams();
   const { getCliente, updateCliente, deleteCliente, motocicletas } = useWorkshopStore();
+  const user = useAuthStore((state) => state.user);
+  const canDelete = canManageWorkshop(user);
   const cliente = getCliente(id);
   const navigate = useNavigate();
 
@@ -41,7 +45,7 @@ export function ClienteDetailPage() {
       <PageHeader
         title={cliente.nombre}
         subtitle="Detalle y edicion del cliente."
-        actions={<Button type="button" variant="danger" onClick={() => void removeCliente()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button>}
+        actions={canDelete ? <Button type="button" variant="danger" onClick={() => void removeCliente()}><Trash2 className="h-4 w-4 shrink-0" /> Eliminar</Button> : undefined}
       />
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <Card>
