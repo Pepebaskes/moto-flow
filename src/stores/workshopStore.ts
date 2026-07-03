@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { mockData } from "@/lib/mockData";
+import { notifyOrderStatusChange } from "@/lib/notifications";
 import { allowLocalMode, hasSupabaseCredentials, storageBucket, supabase } from "@/lib/supabase";
-import type { Cliente, Cotizacion, EstadoOperativo, EstadoOrden, Evidencia, Motocicleta, MovimientoOrden, OrdenTrabajo, PrioridadTrabajo, TamanoTrabajo, TipoEvidencia, TipoTrabajo, WorkshopState } from "@/types/motoflow";
+import type { Cliente, Cotizacion, EstadoOperativo, EstadoOrden, Evidencia, GastoBalance, Motocicleta, MovimientoOrden, NotificacionCliente, OrdenTrabajo, PrioridadTrabajo, TamanoTrabajo, TipoEvidencia, TipoTrabajo, WorkshopState } from "@/types/motoflow";
 import { createPublicCode, uid } from "@/utils/format";
 
 type NewCliente = Omit<Cliente, "id" | "taller_id" | "created_at" | "updated_at">;
@@ -15,6 +16,7 @@ type NewCotizacion = Omit<Cotizacion, "id" | "taller_id" | "created_at" | "updat
   fecha?: string;
   estado?: Cotizacion["estado"];
 };
+type NewGastoBalance = Omit<GastoBalance, "id" | "taller_id" | "created_at" | "updated_at">;
 
 type Store = WorkshopState & {
   usingSupabase: boolean;
@@ -35,6 +37,8 @@ type Store = WorkshopState & {
   addOrden: (data: NewOrden) => Promise<void>;
   addCotizacion: (data: NewCotizacion) => Promise<void>;
   deleteCotizacion: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+  addGastoBalance: (data: NewGastoBalance) => Promise<void>;
+  deleteGastoBalance: (id: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   updateOrden: (id: string, data: NewOrden) => Promise<void>;
   updateFechaEstimada: (id: string, fecha_estimada: string) => Promise<void>;
   changeOrderStatus: (id: string, estado: EstadoOrden) => Promise<void>;
@@ -46,6 +50,9 @@ type Store = WorkshopState & {
     nota?: string;
     publico: boolean;
     costo?: number;
+    refaccion?: string;
+    costo_refaccion?: number;
+    costo_mano_obra?: number;
     kilometraje?: number;
     estado_nuevo?: EstadoOrden;
     ciclo_trabajo_id?: string;
@@ -161,7 +168,7 @@ async function deleteRow(table: string, id: string) {
 export const useWorkshopStore = create<Store>()(
   persist(
     (set, get) => ({
-      ...(allowLocalMode ? mockData : { clientes: [], motocicletas: [], ordenes: [], evidencias: [], movimientos: [], cotizaciones: [] }),
+      ...(allowLocalMode ? { ...mockData, notificaciones: [], gastosBalance: [] } : { clientes: [], motocicletas: [], ordenes: [], evidencias: [], movimientos: [], cotizaciones: [], notificaciones: [], gastosBalance: [] }),
       usingSupabase: hasSupabaseCredentials,
       isLoading: false,
       error: undefined,
@@ -180,7 +187,9 @@ export const useWorkshopStore = create<Store>()(
             selectTable<MovimientoOrden>("movimientos_orden"),
           ]);
           const cotizaciones = await selectTable<Cotizacion>("cotizaciones").catch(() => get().cotizaciones);
-          set({ tallerId, clientes, motocicletas, ordenes, evidencias, movimientos, cotizaciones, isLoading: false });
+          const notificaciones = await selectTable<NotificacionCliente>("notificaciones_cliente").catch(() => get().notificaciones);
+          const gastosBalance = await selectTable<GastoBalance>("balance_gastos").catch(() => get().gastosBalance);
+          set({ tallerId, clientes, motocicletas, ordenes, evidencias, movimientos, cotizaciones, notificaciones, gastosBalance, isLoading: false });
         } catch (error) {
           set({ error: error instanceof Error ? error.message : "No se pudo cargar Supabase.", isLoading: false });
         }
@@ -434,6 +443,32 @@ export const useWorkshopStore = create<Store>()(
         return { ok: true };
       },
 
+      addGastoBalance: async (data) => {
+        const payload = {
+          ...data,
+          concepto: data.concepto.trim(),
+          nota: data.nota?.trim() || null,
+          monto: Number(data.monto || 0),
+          fecha: data.fecha || new Date().toISOString().slice(0, 10),
+        };
+
+        if (supabase) {
+          const taller_id = await requireTallerId(get().tallerId);
+          const gasto = await insertRow<GastoBalance>("balance_gastos", { ...payload, taller_id });
+          if (gasto) set((state) => ({ gastosBalance: [gasto, ...state.gastosBalance], tallerId: taller_id }));
+          return;
+        }
+
+        const gasto = withBase("gasto", payload);
+        set((state) => ({ gastosBalance: [gasto, ...state.gastosBalance] }));
+      },
+
+      deleteGastoBalance: async (id) => {
+        if (supabase) await deleteRow("balance_gastos", id);
+        set((state) => ({ gastosBalance: state.gastosBalance.filter((gasto) => gasto.id !== id) }));
+        return { ok: true };
+      },
+
       updateOrden: async (id, data) => {
         const current = get().ordenes.find((orden) => orden.id === id);
         const payload = { ...data, codigo_publico: data.codigo_publico || current?.codigo_publico || createPublicCode() };
@@ -472,6 +507,7 @@ export const useWorkshopStore = create<Store>()(
       changeOrderStatus: async (id, estado) => {
         const orden = get().ordenes.find((item) => item.id === id);
         if (!orden) return;
+        if (orden.estado === estado) return;
 
         if (supabase) {
           const taller_id = await requireTallerId(get().tallerId);
@@ -490,11 +526,23 @@ export const useWorkshopStore = create<Store>()(
             ordenes: state.ordenes.map((item) => (item.id === id && updated ? updated : item)),
             movimientos: movimiento ? [movimiento, ...state.movimientos] : state.movimientos,
           }));
+          if (updated) {
+            const cliente = get().getCliente(updated.cliente_id);
+            const moto = get().getMoto(updated.moto_id);
+            const notification = await notifyOrderStatusChange({ tallerId: taller_id, cliente, moto, orden: updated, estado });
+            if (notification.ok) {
+              const ordenNotificada = await updateRow<OrdenTrabajo>("ordenes_trabajo", id, { ultima_notificacion_estado: estado });
+              if (ordenNotificada) set((state) => ({ ordenes: state.ordenes.map((item) => (item.id === id ? ordenNotificada : item)) }));
+              const notificaciones = await selectTable<NotificacionCliente>("notificaciones_cliente").catch(() => get().notificaciones);
+              set({ notificaciones });
+            }
+          }
           return;
         }
 
+        const updatedLocal = { ...orden, estado, updated_at: stamp() };
         set((state) => ({
-          ordenes: state.ordenes.map((item) => (item.id === id ? { ...item, estado, updated_at: stamp() } : item)),
+          ordenes: state.ordenes.map((item) => (item.id === id ? updatedLocal : item)),
           movimientos: [
             ...state.movimientos,
             withBase("mov", {
@@ -508,14 +556,28 @@ export const useWorkshopStore = create<Store>()(
             }),
           ],
         }));
+        const cliente = get().getCliente(orden.cliente_id);
+        const moto = get().getMoto(orden.moto_id);
+        const notification = await notifyOrderStatusChange({ tallerId: get().tallerId, cliente, moto, orden: updatedLocal, estado });
+        if (notification.ok) {
+          set((state) => ({
+            ordenes: state.ordenes.map((item) => (item.id === id ? { ...item, ultima_notificacion_estado: estado, updated_at: stamp() } : item)),
+          }));
+        }
       },
 
       addMovimiento: async (data) => {
         const moto = data.moto_id ? get().motocicletas.find((item) => item.id === data.moto_id) : undefined;
+        const costo_refaccion = Number(data.costo_refaccion || 0);
+        const costo_mano_obra = Number(data.costo_mano_obra || 0);
+        const costo = Number(data.costo || 0) || costo_refaccion + costo_mano_obra;
         const payload = {
           ...data,
           ciclo_trabajo_id: data.ciclo_trabajo_id || moto?.ciclo_trabajo_id || null,
-          costo: data.costo || null,
+          refaccion: data.refaccion || null,
+          costo_refaccion: costo_refaccion || null,
+          costo_mano_obra: costo_mano_obra || null,
+          costo: costo || null,
           kilometraje: data.kilometraje || null,
         };
 
@@ -590,6 +652,8 @@ export const useWorkshopStore = create<Store>()(
               evidencias: state.evidencias,
               movimientos: state.movimientos,
               cotizaciones: state.cotizaciones,
+              notificaciones: state.notificaciones,
+              gastosBalance: state.gastosBalance,
             }
           : {},
     },

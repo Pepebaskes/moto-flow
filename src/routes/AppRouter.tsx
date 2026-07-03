@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { BitacorasPage } from "@/features/bitacoras/BitacorasPage";
+import { BalancePage } from "@/features/balance/BalancePage";
 import { ClienteCreatePage, ClienteDetailPage } from "@/features/clientes/ClienteDetailPage";
 import { ClientesPage } from "@/features/clientes/ClientesPage";
 import { CotizacionesPage } from "@/features/cotizaciones/CotizacionesPage";
@@ -27,6 +28,7 @@ function PrivateRoutes() {
         <Route path="/bitacoras" element={<BitacorasPage />} />
         <Route path="/historial" element={<HistorialPage />} />
         <Route path="/cotizaciones" element={<CotizacionesPage />} />
+        <Route path="/balance" element={<BalancePage />} />
         <Route path="/kanban" element={<Navigate to="/bitacoras" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

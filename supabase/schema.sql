@@ -39,6 +39,7 @@ create table if not exists public.clientes (
   telefono text not null,
   email text,
   localidad text,
+  acepta_notificaciones boolean not null default true,
   notas text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -99,6 +100,7 @@ create table if not exists public.ordenes_trabajo (
   notas_internas text,
   notas_publicas text,
   codigo_publico text not null unique default upper('MF-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
+  ultima_notificacion_estado text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -130,6 +132,9 @@ create table if not exists public.movimientos_orden (
   nota text,
   publico boolean not null default false,
   costo numeric(12,2),
+  refaccion text,
+  costo_refaccion numeric(12,2),
+  costo_mano_obra numeric(12,2),
   kilometraje int,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -153,7 +158,80 @@ create table if not exists public.cotizaciones (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.notificaciones_cliente (
+  id uuid primary key default gen_random_uuid(),
+  taller_id uuid not null references public.talleres(id) on delete cascade,
+  cliente_id uuid not null references public.clientes(id) on delete cascade,
+  orden_id uuid not null references public.ordenes_trabajo(id) on delete cascade,
+  canal text not null default 'whatsapp',
+  telefono text not null,
+  mensaje text not null,
+  estado text not null default 'pendiente',
+  evento text not null,
+  proveedor text,
+  proveedor_message_id text,
+  error text,
+  enviado_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.balance_gastos (
+  id uuid primary key default gen_random_uuid(),
+  taller_id uuid not null references public.talleres(id) on delete cascade,
+  concepto text not null,
+  categoria text not null default 'otro',
+  monto numeric(12,2) not null default 0,
+  fecha date not null default current_date,
+  nota text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_notificaciones_cliente_taller_id on public.notificaciones_cliente(taller_id);
+create index if not exists idx_notificaciones_cliente_cliente_id on public.notificaciones_cliente(cliente_id);
+create index if not exists idx_notificaciones_cliente_orden_id on public.notificaciones_cliente(orden_id);
+create index if not exists idx_notificaciones_cliente_estado on public.notificaciones_cliente(estado);
+create index if not exists idx_notificaciones_cliente_evento on public.notificaciones_cliente(evento);
+create index if not exists idx_notificaciones_cliente_created_at on public.notificaciones_cliente(created_at);
+create unique index if not exists idx_notificaciones_cliente_orden_evento_unique on public.notificaciones_cliente(orden_id, evento);
+
+create index if not exists idx_balance_gastos_taller_id on public.balance_gastos(taller_id);
+create index if not exists idx_balance_gastos_categoria on public.balance_gastos(categoria);
+create index if not exists idx_balance_gastos_fecha on public.balance_gastos(fecha);
+create index if not exists idx_balance_gastos_created_at on public.balance_gastos(created_at);
+
+do $$ begin
+  alter table public.notificaciones_cliente
+  add constraint notificaciones_cliente_estado_check
+  check (estado in ('pendiente', 'enviado', 'error', 'omitido'));
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter table public.notificaciones_cliente
+  add constraint notificaciones_cliente_evento_check
+  check (evento in ('orden_recibida', 'diagnostico', 'esperando_autorizacion', 'autorizada', 'esperando_refacciones', 'en_reparacion', 'lista', 'entregada', 'cancelada'));
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter table public.balance_gastos
+  add constraint balance_gastos_categoria_check
+  check (categoria in ('gasolina', 'luz', 'renta', 'comida', 'herramienta', 'refaccion', 'otro'));
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter table public.balance_gastos
+  add constraint balance_gastos_monto_check
+  check (monto >= 0);
+exception when duplicate_object then null;
+end $$;
+
 alter table public.movimientos_orden add column if not exists tipo text not null default 'avance';
+alter table public.clientes add column if not exists acepta_notificaciones boolean not null default true;
+alter table public.ordenes_trabajo add column if not exists ultima_notificacion_estado text;
 alter table public.movimientos_orden alter column orden_id drop not null;
 alter table public.movimientos_orden add column if not exists moto_id uuid references public.motocicletas(id) on delete cascade;
 alter table public.movimientos_orden add column if not exists titulo text not null default 'Actualizacion';
@@ -161,6 +239,9 @@ alter table public.movimientos_orden alter column estado_nuevo drop not null;
 alter table public.movimientos_orden add column if not exists ciclo_trabajo_id text;
 alter table public.movimientos_orden add column if not exists publico boolean not null default false;
 alter table public.movimientos_orden add column if not exists costo numeric(12,2);
+alter table public.movimientos_orden add column if not exists refaccion text;
+alter table public.movimientos_orden add column if not exists costo_refaccion numeric(12,2);
+alter table public.movimientos_orden add column if not exists costo_mano_obra numeric(12,2);
 alter table public.movimientos_orden add column if not exists kilometraje int;
 alter table public.motocicletas add column if not exists fecha_estimada_salida date;
 alter table public.motocicletas add column if not exists activa boolean not null default true;
@@ -189,7 +270,7 @@ $$;
 do $$
 declare table_name text;
 begin
-  foreach table_name in array array['talleres', 'perfiles', 'clientes', 'motocicletas', 'ordenes_trabajo', 'evidencias', 'movimientos_orden', 'cotizaciones']
+  foreach table_name in array array['talleres', 'perfiles', 'clientes', 'motocicletas', 'ordenes_trabajo', 'evidencias', 'movimientos_orden', 'cotizaciones', 'notificaciones_cliente', 'balance_gastos']
   loop
     execute format('alter table public.%I enable row level security', table_name);
   end loop;
@@ -205,6 +286,8 @@ drop policy if exists "Ordenes por taller" on public.ordenes_trabajo;
 drop policy if exists "Evidencias por taller" on public.evidencias;
 drop policy if exists "Movimientos por taller" on public.movimientos_orden;
 drop policy if exists "Cotizaciones por taller" on public.cotizaciones;
+drop policy if exists "Notificaciones por taller" on public.notificaciones_cliente;
+drop policy if exists "Balance gastos por taller" on public.balance_gastos;
 drop policy if exists "Consulta publica de orden" on public.ordenes_trabajo;
 drop policy if exists "Demo taller visible" on public.talleres;
 drop policy if exists "Demo clientes" on public.clientes;
@@ -224,6 +307,8 @@ create policy "Ordenes por taller" on public.ordenes_trabajo for all using (tall
 create policy "Evidencias por taller" on public.evidencias for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
 create policy "Movimientos por taller" on public.movimientos_orden for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
 create policy "Cotizaciones por taller" on public.cotizaciones for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
+create policy "Notificaciones por taller" on public.notificaciones_cliente for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
+create policy "Balance gastos por taller" on public.balance_gastos for all using (taller_id = public.current_taller_id()) with check (taller_id = public.current_taller_id());
 create policy "Consulta publica de orden" on public.ordenes_trabajo for select using (codigo_publico is not null);
 create or replace function public.consulta_cliente(p_busqueda text)
 returns jsonb
@@ -337,6 +422,8 @@ drop trigger if exists set_ordenes_updated_at on public.ordenes_trabajo;
 drop trigger if exists set_evidencias_updated_at on public.evidencias;
 drop trigger if exists set_movimientos_updated_at on public.movimientos_orden;
 drop trigger if exists set_cotizaciones_updated_at on public.cotizaciones;
+drop trigger if exists set_notificaciones_updated_at on public.notificaciones_cliente;
+drop trigger if exists set_balance_gastos_updated_at on public.balance_gastos;
 
 create trigger set_talleres_updated_at before update on public.talleres for each row execute function public.set_updated_at();
 create trigger set_perfiles_updated_at before update on public.perfiles for each row execute function public.set_updated_at();
@@ -346,6 +433,8 @@ create trigger set_ordenes_updated_at before update on public.ordenes_trabajo fo
 create trigger set_evidencias_updated_at before update on public.evidencias for each row execute function public.set_updated_at();
 create trigger set_movimientos_updated_at before update on public.movimientos_orden for each row execute function public.set_updated_at();
 create trigger set_cotizaciones_updated_at before update on public.cotizaciones for each row execute function public.set_updated_at();
+create trigger set_notificaciones_updated_at before update on public.notificaciones_cliente for each row execute function public.set_updated_at();
+create trigger set_balance_gastos_updated_at before update on public.balance_gastos for each row execute function public.set_updated_at();
 
 drop policy if exists "Evidencias storage lectura publica" on storage.objects;
 drop policy if exists "Evidencias storage carga publica" on storage.objects;

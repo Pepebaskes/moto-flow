@@ -74,7 +74,17 @@ function downloadBitacoraPdf({
     y += 5;
 
     if (movimiento.costo) {
-      doc.text(`Costo registrado: ${currency(movimiento.costo)}`, 14, y);
+      doc.text(`Total registrado: ${currency(movimiento.costo)}`, 14, y);
+      y += 5;
+    }
+
+    if (movimiento.refaccion) {
+      doc.text(`Refaccion: ${movimiento.refaccion}`, 14, y);
+      y += 5;
+    }
+
+    if (movimiento.costo_refaccion || movimiento.costo_mano_obra) {
+      doc.text(`Refaccion: ${currency(movimiento.costo_refaccion || 0)} | Mano de obra: ${currency(movimiento.costo_mano_obra || 0)}`, 14, y);
       y += 5;
     }
 

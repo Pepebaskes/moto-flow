@@ -176,7 +176,9 @@ export function BitacorasPage() {
         titulo: String(form.get("titulo") || "Actualizacion de taller"),
         nota: String(form.get("nota") || ""),
         publico,
-        costo: Number(form.get("costo") || 0),
+        refaccion: String(form.get("refaccion") || ""),
+        costo_refaccion: Number(form.get("costo_refaccion") || 0),
+        costo_mano_obra: Number(form.get("costo_mano_obra") || 0),
         kilometraje: Number(form.get("kilometraje") || moto.kilometraje || 0),
       });
 
@@ -444,9 +446,17 @@ export function BitacorasPage() {
               <Textarea name="nota" placeholder="Describe que se hizo hoy, que se encontro, que falta o que se cotizo." />
             </Field>
 
-            <Field label="Costo agregado">
-              <Input name="costo" type="number" min="0" step="0.01" defaultValue="0" />
-            </Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Field label="Refaccion">
+                <Input name="refaccion" placeholder="Ej. Balatas delanteras, camara, bujia..." />
+              </Field>
+              <Field label="Costo de refaccion">
+                <Input name="costo_refaccion" type="number" min="0" step="0.01" defaultValue="0" />
+              </Field>
+              <Field label="Mano de obra">
+                <Input name="costo_mano_obra" type="number" min="0" step="0.01" defaultValue="0" />
+              </Field>
+            </div>
 
             <Field label="Fotos opcionales">
               <Input name="fotos" type="file" accept="image/*" multiple />
@@ -522,7 +532,10 @@ export function BitacorasPage() {
                 ) : null}
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {movimiento.costo ? <span className="rounded-full bg-[#F2B705] px-3 py-1 text-xs font-semibold text-[#0B0B0B]">{currency(movimiento.costo)}</span> : null}
+                  {movimiento.refaccion ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[#FFF2E1]">Refaccion: {movimiento.refaccion}</span> : null}
+                  {movimiento.costo_refaccion ? <span className="rounded-full bg-[#2F2A24] px-3 py-1 text-xs font-semibold text-[#FFD08A]">Refaccion {currency(movimiento.costo_refaccion)}</span> : null}
+                  {movimiento.costo_mano_obra ? <span className="rounded-full bg-[#2F2A24] px-3 py-1 text-xs font-semibold text-[#FFD08A]">Mano de obra {currency(movimiento.costo_mano_obra)}</span> : null}
+                  {movimiento.costo ? <span className="rounded-full bg-[#F2B705] px-3 py-1 text-xs font-semibold text-[#0B0B0B]">Total {currency(movimiento.costo)}</span> : null}
                   {movimiento.kilometraje ? <span className="rounded-full bg-[#2F2A24] px-3 py-1 text-xs font-semibold text-[#FFF2E1]">{movimiento.kilometraje.toLocaleString()} km</span> : null}
                 </div>
               </article>

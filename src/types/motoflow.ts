@@ -29,6 +29,7 @@ export type Cliente = BaseEntity & {
   telefono: string;
   email?: string;
   localidad?: string;
+  acepta_notificaciones?: boolean;
   notas?: string;
 };
 
@@ -66,6 +67,21 @@ export type OrdenTrabajo = BaseEntity & {
   notas_internas?: string;
   notas_publicas?: string;
   codigo_publico: string;
+  ultima_notificacion_estado?: EstadoOrden;
+};
+
+export type NotificacionCliente = BaseEntity & {
+  cliente_id: string;
+  orden_id: string;
+  canal: "whatsapp" | string;
+  telefono: string;
+  mensaje: string;
+  estado: "pendiente" | "enviado" | "error" | "omitido";
+  evento: EstadoOrden | "orden_recibida";
+  proveedor?: string;
+  proveedor_message_id?: string;
+  error?: string;
+  enviado_at?: string;
 };
 
 export type Evidencia = BaseEntity & {
@@ -89,6 +105,9 @@ export type MovimientoOrden = BaseEntity & {
   nota?: string;
   publico: boolean;
   costo?: number;
+  refaccion?: string;
+  costo_refaccion?: number;
+  costo_mano_obra?: number;
   kilometraje?: number;
 };
 
@@ -114,6 +133,14 @@ export type Cotizacion = BaseEntity & {
   clausula: string;
 };
 
+export type GastoBalance = BaseEntity & {
+  concepto: string;
+  categoria: "gasolina" | "luz" | "renta" | "comida" | "herramienta" | "refaccion" | "otro";
+  monto: number;
+  fecha: string;
+  nota?: string;
+};
+
 export type WorkshopState = {
   clientes: Cliente[];
   motocicletas: Motocicleta[];
@@ -121,4 +148,6 @@ export type WorkshopState = {
   evidencias: Evidencia[];
   movimientos: MovimientoOrden[];
   cotizaciones: Cotizacion[];
+  notificaciones: NotificacionCliente[];
+  gastosBalance: GastoBalance[];
 };

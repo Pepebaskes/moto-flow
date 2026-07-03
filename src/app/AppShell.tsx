@@ -1,4 +1,4 @@
-import { Bike, BookOpen, FileClock, FileText, Home, LogOut, Menu, Users, X } from "lucide-react";
+import { Bike, BookOpen, FileClock, FileText, Home, LogOut, Menu, PieChart, Users, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { AuthPage } from "@/features/auth/AuthPage";
@@ -13,6 +13,7 @@ const nav = [
   { to: "/bitacoras", label: "Trabajos", icon: BookOpen },
   { to: "/historial", label: "Historial", icon: FileClock },
   { to: "/cotizaciones", label: "Cotizaciones", icon: FileText },
+  { to: "/balance", label: "Balance", icon: PieChart },
 ];
 
 function Brand() {

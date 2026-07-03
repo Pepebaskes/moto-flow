@@ -217,6 +217,7 @@ export function PortalClientePage() {
                       ) : null}
                     </div>
                     {movimiento.nota ? <p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-[#2F2A24]">{movimiento.nota}</p> : null}
+                    {movimiento.refaccion ? <p className="mt-2 break-words text-xs font-semibold text-[#8A6400]">Refaccion: {movimiento.refaccion}</p> : null}
                   </article>
                 ))}
               </div>
