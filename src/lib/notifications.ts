@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Cliente, EstadoOrden, Motocicleta, NotificacionCliente, OrdenTrabajo } from "@/types/motoflow";
+import type { Cliente, EstadoOrden, Motocicleta, MovimientoOrden, NotificacionCliente, OrdenTrabajo } from "@/types/motoflow";
 import { estadoLabels } from "@/utils/format";
 
 type NotificationInput = {
@@ -10,15 +10,24 @@ type NotificationInput = {
   estado: EstadoOrden;
 };
 
+type WorkUpdateNotificationInput = {
+  tallerId?: string;
+  cliente?: Cliente;
+  moto?: Motocicleta;
+  movimiento: MovimientoOrden;
+};
+
 type NotificationPayload = {
   taller_id: string;
   cliente_id: string;
-  orden_id: string;
+  orden_id?: string | null;
+  moto_id?: string | null;
+  movimiento_id?: string | null;
   canal: "whatsapp";
   telefono: string;
   mensaje: string;
   estado: NotificacionCliente["estado"];
-  evento: EstadoOrden | "orden_recibida";
+  evento: NotificacionCliente["evento"];
   proveedor?: string | null;
   proveedor_message_id?: string | null;
   error?: string | null;
@@ -59,6 +68,16 @@ export function buildOrderStatusMessage({ cliente, moto, orden, estado }: Notifi
   }
 
   return `Hola ${clienteNombre}, te contactamos del taller para actualizarte sobre tu moto ${motoLabel}.\nEl estado actual de tu servicio es: ${estadoLegible}.\nPuedes consultar el avance aqui: ${portalUrl}`;
+}
+
+export function buildWorkUpdateMessage({ cliente, moto, movimiento }: WorkUpdateNotificationInput) {
+  const clienteNombre = cliente?.nombre ?? "cliente";
+  const motoLabel = moto ? `${moto.marca} ${moto.modelo}` : "tu moto";
+  const portalUrl = `${getPublicAppUrl()}/consulta/${encodeURIComponent(moto?.placas || moto?.numero_serie || "")}`;
+  const titulo = movimiento.titulo || "Actualizacion de trabajo";
+  const nota = movimiento.nota ? `\nDetalle: ${movimiento.nota}` : "";
+
+  return `Hola ${clienteNombre}, te contactamos del taller para actualizarte sobre tu moto ${motoLabel}.\nAvance: ${titulo}.${nota}\nPuedes consultar el avance aqui: ${portalUrl}`;
 }
 
 export async function sendWhatsAppNotificationMock(notification: Pick<NotificationPayload, "telefono" | "mensaje" | "evento">) {
@@ -140,38 +159,109 @@ export async function createOrderStatusNotification(input: NotificationInput) {
   return { ok: true as const, notification: data as NotificacionCliente };
 }
 
+export async function createWorkUpdateNotification(input: WorkUpdateNotificationInput) {
+  const { tallerId, cliente, moto, movimiento } = input;
+  const evento: NotificacionCliente["evento"] = movimiento.titulo.toLowerCase().includes("fecha estimada") ? "fecha_estimada_actualizada" : "bitacora_actualizada";
+
+  if (!cliente?.id) return { ok: false as const, reason: "cliente_no_encontrado" };
+  if (!cliente.telefono) return { ok: false as const, reason: "cliente_sin_telefono" };
+  if (cliente.acepta_notificaciones === false) return { ok: false as const, reason: "cliente_no_acepta" };
+  if (!movimiento.publico) return { ok: false as const, reason: "movimiento_no_publico" };
+
+  const mensaje = buildWorkUpdateMessage(input);
+  const provider = getProvider();
+
+  if (!supabase || !tallerId) {
+    const mock = await sendWhatsAppNotificationMock({ telefono: cliente.telefono, mensaje, evento });
+    return { ok: true as const, notification: { ...mock, mensaje, telefono: cliente.telefono, evento } };
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("notificaciones_cliente")
+    .select("id")
+    .eq("movimiento_id", movimiento.id)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return { ok: false as const, reason: "notificacion_duplicada" };
+
+  const payload: NotificationPayload = {
+    taller_id: tallerId,
+    cliente_id: cliente.id,
+    orden_id: movimiento.orden_id || null,
+    moto_id: movimiento.moto_id || moto?.id || null,
+    movimiento_id: movimiento.id,
+    canal: "whatsapp",
+    telefono: cliente.telefono,
+    mensaje,
+    estado: "pendiente",
+    evento,
+    proveedor: provider || null,
+    proveedor_message_id: null,
+    error: null,
+    enviado_at: null,
+  };
+
+  const { data, error } = await supabase
+    .from("notificaciones_cliente")
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, notification: data as NotificacionCliente };
+}
+
+async function deliverCreatedNotification(created: Awaited<ReturnType<typeof createOrderStatusNotification>> | Awaited<ReturnType<typeof createWorkUpdateNotification>>, fallback: { telefono: string; mensaje: string; evento: NotificacionCliente["evento"] }) {
+  if (!created.ok) return created;
+
+  const provider = getProvider();
+  if (!provider || !supabase || !hasNotificationId(created.notification)) {
+    const mock = await sendWhatsAppNotificationMock(fallback);
+
+    if (supabase && hasNotificationId(created.notification)) {
+      await supabase
+        .from("notificaciones_cliente")
+        .update(mock)
+        .eq("id", created.notification.id);
+    }
+
+    return { ok: true as const, notification: created.notification };
+  }
+
+  const sent = await sendWhatsAppNotificationViaProvider(created.notification);
+  if (!sent.ok) {
+    return { ok: false as const, reason: "provider_error", error: sent.error };
+  }
+
+  console.info("[MotoFlow] Notificacion WhatsApp enviada con proveedor", provider, sent);
+  return { ok: true as const, notification: created.notification };
+}
+
 export async function notifyOrderStatusChange(input: NotificationInput) {
   try {
     const created = await createOrderStatusNotification(input);
-    if (!created.ok) return created;
-
-    const provider = getProvider();
-    if (!provider || !supabase || !hasNotificationId(created.notification)) {
-      const mock = await sendWhatsAppNotificationMock({
-        telefono: input.cliente?.telefono ?? "",
-        mensaje: "mensaje" in created.notification ? created.notification.mensaje : buildOrderStatusMessage(input),
-        evento: eventForStatus(input.estado),
-      });
-
-      if (supabase && hasNotificationId(created.notification)) {
-        await supabase
-          .from("notificaciones_cliente")
-          .update(mock)
-          .eq("id", created.notification.id);
-      }
-
-      return { ok: true as const, notification: created.notification };
-    }
-
-    const sent = await sendWhatsAppNotificationViaProvider(created.notification);
-    if (!sent.ok) {
-      return { ok: false as const, reason: "provider_error", error: sent.error };
-    }
-
-    console.info("[MotoFlow] Notificacion WhatsApp enviada con proveedor", provider, sent);
-    return { ok: true as const, notification: created.notification };
+    return await deliverCreatedNotification(created, {
+      telefono: input.cliente?.telefono ?? "",
+      mensaje: created.ok && "mensaje" in created.notification ? created.notification.mensaje : buildOrderStatusMessage(input),
+      evento: eventForStatus(input.estado),
+    });
   } catch (error) {
     console.error("[MotoFlow] No se pudo generar notificacion de cliente", error);
+    return { ok: false as const, reason: "error", error };
+  }
+}
+
+export async function notifyWorkUpdate(input: WorkUpdateNotificationInput) {
+  try {
+    const created = await createWorkUpdateNotification(input);
+    return await deliverCreatedNotification(created, {
+      telefono: input.cliente?.telefono ?? "",
+      mensaje: created.ok && "mensaje" in created.notification ? created.notification.mensaje : buildWorkUpdateMessage(input),
+      evento: input.movimiento.titulo.toLowerCase().includes("fecha estimada") ? "fecha_estimada_actualizada" : "bitacora_actualizada",
+    });
+  } catch (error) {
+    console.error("[MotoFlow] No se pudo generar notificacion de bitacora", error);
     return { ok: false as const, reason: "error", error };
   }
 }

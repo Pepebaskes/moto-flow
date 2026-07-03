@@ -72,12 +72,14 @@ export type OrdenTrabajo = BaseEntity & {
 
 export type NotificacionCliente = BaseEntity & {
   cliente_id: string;
-  orden_id: string;
+  orden_id?: string;
+  moto_id?: string;
+  movimiento_id?: string;
   canal: "whatsapp" | string;
   telefono: string;
   mensaje: string;
   estado: "pendiente" | "enviado" | "error" | "omitido";
-  evento: EstadoOrden | "orden_recibida";
+  evento: EstadoOrden | "orden_recibida" | "bitacora_actualizada" | "fecha_estimada_actualizada";
   proveedor?: string;
   proveedor_message_id?: string;
   error?: string;

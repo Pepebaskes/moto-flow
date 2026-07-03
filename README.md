@@ -54,6 +54,12 @@ Para agregar la capa de notificaciones en una base existente, ejecuta tambien:
 supabase/migrations/add_customer_notifications.sql
 ```
 
+Si ya habias creado `notificaciones_cliente` antes de conectar avisos desde bitacoras/trabajos, ejecuta:
+
+```text
+supabase/migrations/add_work_update_notifications.sql
+```
+
 Para agregar los gastos manuales del modulo de Balance en una base existente, ejecuta:
 
 ```text
@@ -90,7 +96,7 @@ Sin `.env`, la app funciona en modo local con `localStorage`.
 
 ## Notificaciones automaticas al cliente
 
-Cuando una orden de trabajo cambia de estado correctamente, MotoFlow prepara una notificacion para el cliente asociado. El sistema valida que el cliente tenga telefono, que acepte notificaciones y que ese mismo estado no se haya notificado antes.
+Cuando una orden de trabajo cambia de estado correctamente, MotoFlow prepara una notificacion para el cliente asociado. Tambien genera una notificacion cuando se agrega una bitacora visible para el cliente desde Trabajos activos. El sistema valida que el cliente tenga telefono, que acepte notificaciones y que no se haya notificado antes ese mismo movimiento.
 
 La notificacion se guarda en la tabla `notificaciones_cliente` con canal `whatsapp`. Si `VITE_WHATSAPP_PROVIDER` esta vacio, MotoFlow registra la notificacion como simulada y escribe el aviso en consola. Si `VITE_WHATSAPP_PROVIDER=twilio`, MotoFlow invoca la Edge Function `send-whatsapp-notification`, que envia el mensaje desde Supabase usando secretos privados.
 

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { mockData } from "@/lib/mockData";
-import { notifyOrderStatusChange } from "@/lib/notifications";
+import { notifyOrderStatusChange, notifyWorkUpdate } from "@/lib/notifications";
 import { allowLocalMode, hasSupabaseCredentials, storageBucket, supabase } from "@/lib/supabase";
 import type { Cliente, Cotizacion, EstadoOperativo, EstadoOrden, Evidencia, GastoBalance, Motocicleta, MovimientoOrden, NotificacionCliente, OrdenTrabajo, PrioridadTrabajo, TamanoTrabajo, TipoEvidencia, TipoTrabajo, WorkshopState } from "@/types/motoflow";
 import { createPublicCode, uid } from "@/utils/format";
@@ -568,6 +568,7 @@ export const useWorkshopStore = create<Store>()(
 
       addMovimiento: async (data) => {
         const moto = data.moto_id ? get().motocicletas.find((item) => item.id === data.moto_id) : undefined;
+        const orden = data.orden_id ? get().ordenes.find((item) => item.id === data.orden_id) : undefined;
         const costo_refaccion = Number(data.costo_refaccion || 0);
         const costo_mano_obra = Number(data.costo_mano_obra || 0);
         const costo = Number(data.costo || 0) || costo_refaccion + costo_mano_obra;
@@ -587,12 +588,28 @@ export const useWorkshopStore = create<Store>()(
             taller_id,
             ...payload,
           });
-          if (movimiento) set((state) => ({ movimientos: [movimiento, ...state.movimientos], tallerId: taller_id }));
+          if (movimiento) {
+            set((state) => ({ movimientos: [movimiento, ...state.movimientos], tallerId: taller_id }));
+            if (movimiento.publico) {
+              const motoNotificada = moto ?? (orden?.moto_id ? get().getMoto(orden.moto_id) : undefined);
+              const cliente = motoNotificada ? get().getCliente(motoNotificada.cliente_id) : orden ? get().getCliente(orden.cliente_id) : undefined;
+              const notification = await notifyWorkUpdate({ tallerId: taller_id, cliente, moto: motoNotificada, movimiento });
+              if (notification.ok) {
+                const notificaciones = await selectTable<NotificacionCliente>("notificaciones_cliente").catch(() => get().notificaciones);
+                set({ notificaciones });
+              }
+            }
+          }
           return movimiento ?? undefined;
         }
 
         const movimiento = withBase("mov", payload);
         set((state) => ({ movimientos: [movimiento, ...state.movimientos] }));
+        if (movimiento.publico) {
+          const motoNotificada = moto ?? (orden?.moto_id ? get().getMoto(orden.moto_id) : undefined);
+          const cliente = motoNotificada ? get().getCliente(motoNotificada.cliente_id) : orden ? get().getCliente(orden.cliente_id) : undefined;
+          await notifyWorkUpdate({ tallerId: get().tallerId, cliente, moto: motoNotificada, movimiento });
+        }
         return movimiento;
       },
 
