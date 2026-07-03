@@ -25,6 +25,14 @@ function normalizeWhatsAppNumber(phone: string) {
   return `whatsapp:+${withCountry}`;
 }
 
+function splitTemplateVariables(message: string) {
+  const [greeting = "", ...rest] = message.split("\n");
+  return {
+    "1": greeting.replace(/^Hola\s+/i, "").replace(/,.*$/, "").trim() || "cliente",
+    "2": rest.join(" ").replace(/\s+/g, " ").slice(0, 450) || message.slice(0, 450),
+  };
+}
+
 async function supabaseRequest(path: string, init: RequestInit = {}) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -67,6 +75,7 @@ async function sendWithTwilio(notification: NotificationRow) {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM");
+  const contentSid = Deno.env.get("TWILIO_CONTENT_SID");
 
   if (!accountSid || !authToken || !from) {
     throw new Error("Faltan TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN o TWILIO_WHATSAPP_FROM.");
@@ -75,8 +84,14 @@ async function sendWithTwilio(notification: NotificationRow) {
   const params = new URLSearchParams({
     From: from,
     To: normalizeWhatsAppNumber(notification.telefono),
-    Body: notification.mensaje,
   });
+
+  if (contentSid) {
+    params.set("ContentSid", contentSid);
+    params.set("ContentVariables", JSON.stringify(splitTemplateVariables(notification.mensaje)));
+  } else {
+    params.set("Body", notification.mensaje);
+  }
 
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
     method: "POST",

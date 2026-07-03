@@ -87,7 +87,7 @@ export function PortalClientePage() {
 
       return (
         normalizeLookup(item.placas) === normalized ||
-        normalizeLookup(item.numero_serie ?? "") === normalized ||
+        normalizeLookup(cliente?.telefono ?? "") === normalized ||
         cliente?.nombre.toLowerCase().includes(text) ||
         Boolean(ordenLegacy)
       );
@@ -130,14 +130,14 @@ export function PortalClientePage() {
         <div className="mb-4 min-w-0 rounded-3xl bg-[#0B0B0B] p-5 text-white shadow-xl shadow-[#2F2A24]/25">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F2B705]">Taller Villa</p>
           <h1 className="mt-2 break-words text-2xl font-semibold sm:text-3xl">Consulta tu motocicleta</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#FFF2E1]/72">Ingresa placas, nombre o numero de serie para ver avances publicos.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#FFF2E1]/72">Ingresa placas, nombre o telefono para ver avances publicos.</p>
         </div>
 
         <Card className={`mb-4 rounded-3xl p-3 ${lightCard}`}>
           <form className="grid min-w-0 gap-2" onSubmit={search}>
             <div className="relative min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2F2A24]/45" />
-              <Input className={`${lightInput} pl-10`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ej. ABC123 o Ana Martinez" />
+              <Input className={`${lightInput} pl-10`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ej. ABC123, Ana Martinez o 3211022913" />
             </div>
             <Button type="submit" className="w-full">Consultar</Button>
           </form>
@@ -148,7 +148,7 @@ export function PortalClientePage() {
 
         {codigo && !loading && !data ? (
           <Card className={lightCard}>
-            <p className="font-semibold">No encontramos una moto con esas placas o nombre.</p>
+            <p className="font-semibold">No encontramos una moto con esas placas, nombre o telefono.</p>
           </Card>
         ) : null}
 

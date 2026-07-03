@@ -61,11 +61,11 @@ export function AuthPage() {
 
             <div>
               <p className="text-sm font-semibold text-white">Consulta del cliente</p>
-              <p className="mt-1 text-xs leading-5 text-[#FFF2E1]/55">Busca el avance publico con placas, nombre o numero de serie.</p>
+              <p className="mt-1 text-xs leading-5 text-[#FFF2E1]/55">Busca el avance publico con placas, nombre o telefono.</p>
               <form className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] lg:grid-cols-1" onSubmit={submitClient}>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#FFF2E1]/42" />
-                  <Input className="pl-10" value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Placas, nombre o serie" />
+                  <Input className="pl-10" value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Placas, nombre o telefono" />
                 </div>
                 <Button type="submit" variant="secondary">Consultar</Button>
               </form>

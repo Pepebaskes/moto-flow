@@ -80,7 +80,7 @@ usuario: mecanico
 contraseña: 123
 ```
 
-El cliente no necesita cuenta. En la pantalla inicial, del lado derecho, puede buscar por placas, nombre o numero de serie.
+El cliente no necesita cuenta. En la pantalla inicial puede buscar por placas, nombre o telefono.
 
 ## Guardado real en Supabase
 
@@ -158,6 +158,32 @@ VITE_PUBLIC_APP_URL=https://moto-flow.vercel.app
 10. Haz redeploy en Vercel.
 11. Cambia el estado de una orden. Si el cliente tiene telefono y acepta notificaciones, se crea el registro en `notificaciones_cliente` y la Edge Function intenta enviar el WhatsApp.
 
+### Pasar Twilio WhatsApp a produccion
+
+Para enviar a cualquier cliente sin que se una al sandbox, el taller necesita WhatsApp Business en produccion:
+
+1. En Twilio entra a `Messaging > Senders > WhatsApp senders`.
+2. Registra o conecta el numero que usara el taller como WhatsApp Business.
+3. Completa el flujo de aprobacion de Meta/Twilio para el sender.
+4. Crea una plantilla aprobada en `Messaging > Content Template Builder`.
+5. La plantilla debe tener dos variables:
+
+```text
+Hola {{1}}, tenemos una actualizacion de Taller de Motos Villa.
+{{2}}
+```
+
+6. Cuando Twilio apruebe la plantilla, copia su `Content SID`, que empieza con `HX`.
+7. Guarda el Content SID como secreto de Supabase:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID=HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+supabase secrets set TWILIO_WHATSAPP_FROM=whatsapp:+52TU_NUMERO_DE_TALLER
+supabase functions deploy send-whatsapp-notification
+```
+
+Si `TWILIO_CONTENT_SID` existe, la Edge Function envia usando plantilla aprobada. Si no existe, intenta enviar texto libre, util para pruebas con sandbox o conversaciones dentro de ventana de 24 horas.
+
 ## Rutas principales
 
 - `/` Dashboard
@@ -167,7 +193,7 @@ VITE_PUBLIC_APP_URL=https://moto-flow.vercel.app
 - `/cotizaciones` Cotizaciones
 - `/balance` Balance mensual del taller
 - `/consulta` Portal publico del cliente
-- `/consulta/:codigo` Consulta por placas, nombre o numero de serie
+- `/consulta/:codigo` Consulta por placas, nombre o telefono
 
 ## Balance mensual
 
@@ -182,5 +208,5 @@ El resumen mensual muestra ingresos, refacciones, gastos y utilidad neta. Tambie
 3. Al guardar la moto, MotoFlow crea automaticamente su ingreso al taller, con fecha y hora.
 4. En `/bitacoras`, el mecanico abre el trabajo activo y registra diagnostico, prioridad, proceso, salida, cotizacion o nota.
 5. Cada entrada puede marcarse como visible para el cliente y puede sumar costo a la cotizacion acumulada.
-6. El cliente consulta el progreso en `/consulta` escribiendo sus placas, nombre o numero de serie.
+6. El cliente consulta el progreso en `/consulta` escribiendo sus placas, nombre o telefono.
 7. El detalle de cada motocicleta muestra su historial acumulado.

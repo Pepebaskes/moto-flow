@@ -336,7 +336,7 @@ begin
     from public.motocicletas m
     join public.clientes c on c.id = m.cliente_id
     where lower(regexp_replace(coalesce(m.placas, ''), '[^a-zA-Z0-9]', '', 'g')) = busqueda_limpia
-       or lower(regexp_replace(coalesce(m.numero_serie, ''), '[^a-zA-Z0-9]', '', 'g')) = busqueda_limpia
+       or lower(regexp_replace(coalesce(c.telefono, ''), '[^a-zA-Z0-9]', '', 'g')) = busqueda_limpia
        or lower(c.nombre) like '%' || lower(p_busqueda) || '%'
        or exists (
         select 1
